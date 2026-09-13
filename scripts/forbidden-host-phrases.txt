@@ -1,0 +1,4 @@
+subagent_type
+Spawn `Task`
+Task subagent
+readonly: true
