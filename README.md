@@ -20,6 +20,17 @@ npx skills@latest add /absolute/path/to/agent-toolkit \
 
 Then copy `templates/AGENTS.md` to the consumer repo root if `AGENTS.md` is missing. Copy `templates/CLAUDE.md` to `CLAUDE.md` if that file is missing.
 
+## Optional pack
+
+The default catalog includes architect, arena, blast-radius, bro, show-me-your-work, teach, technical-writing, and why. Extra workflow skills stay under `optional/`. Install them with `--full-depth` and the skill filters below.
+
+```bash
+npx skills@latest add olibyte/agent-toolkit --full-depth \
+  -s swarm -s interrogate -s figure-it-out \
+  -s create-verification-skill -s maintain-verification-skill \
+  -a claude-code -a cursor -a codex -a antigravity -a antigravity-cli -y
+```
+
 ## Commit
 
 Commit these paths so the team shares the same skills and baseline:

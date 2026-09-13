@@ -6,6 +6,21 @@ import { fileURLToPath } from 'node:url'
 const ALLOWED_KEYS = new Set(['name', 'description', 'license'])
 const SIBLING_DIRS = ['playbooks', 'scripts', 'references', 'assets']
 const HOST_AGNOSTIC_REPLACES = [
+  ['`subagent_type`: `generalPurpose`', "the host's general-purpose subagent"],
+  ['- `readonly`: `true`', '- Do not write to the parent workspace'],
+  ['Launch all reviewers in a single message using the Task tool.', 'Spawn all reviewers in one turn.'],
+  ["the Task tool's error message", 'the spawn error'],
+  ['`~/.cursor/rules/pstack-models.mdc`', 'the host configured-models file'],
+  ['~/.cursor/rules/pstack-models.mdc', 'the host configured-models file'],
+  ['.cursor/skills/', '.agents/skills/'],
+  [
+    'When a worker must start from a non-default pushed branch, pass `cloud_base_branch`.',
+    'When a worker must start from a non-default pushed branch, pass that branch as the isolated workspace base when the host supports it.',
+  ],
+  [
+    'Use `environment: "local"` only when the worker needs access to something on the user\'s computer.',
+    'Use this machine only when the worker needs this computer.',
+  ],
   ['subagent_type: "poteto-agent"', 'a poteto-mode subagent (read references/poteto-agent.md first)'],
   ['subagent_type: generalPurpose', "the host's general-purpose subagent"],
   ['only through the Task tool', 'only by spawning subagents'],
@@ -34,9 +49,20 @@ const HOST_AGNOSTIC_REPLACES = [
   ['environment: "cloud"', 'an isolated workspace'],
   ["Cursor's built-in babysit skill", 'a host built-in babysit skill, if it has one'],
   ['a Cursor restart', 'an editor restart'],
+  [
+    'Before spawning investigators, list the available MCPs from the Cursor environment. Use the available-tools map when present. Otherwise inspect the `mcps/` directory Cursor exposes for enabled MCP servers.',
+    "Before spawning investigators, list the host's available MCP servers. Use the available-tools map when present. Otherwise inspect whatever MCP listing the host exposes.",
+  ],
+  [
+    "Don't glob across `~/.cursor/projects/*/`. That reads unrelated private chats.",
+    "Don't glob across other projects' transcript dirs. That reads unrelated private chats.",
+  ],
 ]
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const CATALOG_SKILLS_DIR = path.join(REPO_ROOT, 'skills')
+const OPTIONAL_DIR = path.join(REPO_ROOT, 'optional')
+const OPTIONAL_SKILLS_FILE = path.join(REPO_ROOT, 'scripts/optional-skills.txt')
+const DEFAULT_PSTACK_SKILLS_FILE = path.join(REPO_ROOT, 'scripts/default-pstack-skills.txt')
 const FORBIDDEN_PHRASES_FILE = path.join(REPO_ROOT, 'scripts/forbidden-host-phrases.txt')
 const PRINCIPLE_LEAF_COUNT = 23
 const PRINCIPLES_PACK_DESCRIPTION =
@@ -106,7 +132,7 @@ function yamlScalar(value) {
 }
 
 function mentionsInvocation(body, skillName) {
-  return body.includes(`$${skillName}`) || body.includes(`/${skillName}`)
+  return body.includes(`$${skillName}`)
 }
 
 function renderSkillMarkdown(skillName, fields, body) {
@@ -164,27 +190,42 @@ export function rewriteHostAgnosticMarkdown(text) {
   ).join('a host built-in babysit skill, if the host has one. Do not route there')
   out = out.split('Multiple `Task` calls').join('Multiple subagent spawns')
   out = out.split('a cloud-agent URL').join('a prior agent URL or transcript')
+  out = out.split("subagent spawn's error message").join('the spawn error')
+  out = out.split(
+    'also run the **why** skill on the existing shape so the rationale becomes a constraint, not a guess.',
+  ).join(
+    'also run the **why** skill when that skill is in the catalog, so the rationale becomes a constraint, not a guess. Skip with reason if it is not installed.',
+  )
+  out = out.split(
+    'Log the run via the **show-me-your-work** skill, one canonical TSV with a row per decision and per unit, evidence as links.',
+  ).join(
+    'Log the run via the **show-me-your-work** skill when that skill is in the catalog. Skip with reason if it is not installed; keep a local TSV instead.',
+  )
+  out = out.split(
+    'with YAML frontmatter (`name: verify-<app>` and a `description` that names the app, the surface, and when to reach for it \u2014 without frontmatter the skill never registers) and these sections',
+  ).join(
+    'with YAML frontmatter. Required keys are `name: verify-<app>`, a `description` that names the app, the surface, and when to reach for it, and `license: MIT`. Without frontmatter the skill never registers. Claude Code also needs a matching `.claude/skills/verify-<app>` link. Include these sections',
+  )
   out = out.replace(/ \( *\)/g, '')
   return out
 }
 
-function rewritePotetoModeHostFiles(destSkillDir) {
-  const playbooksDir = path.join(destSkillDir, 'playbooks')
-  if (fs.existsSync(playbooksDir) && fs.statSync(playbooksDir).isDirectory()) {
-    for (const name of fs.readdirSync(playbooksDir)) {
-      if (!name.endsWith('.md')) continue
-      const file = path.join(playbooksDir, name)
-      fs.writeFileSync(file, rewriteHostAgnosticMarkdown(fs.readFileSync(file, 'utf8')))
+function rewriteDestMarkdown(destSkillDir) {
+  const stack = [destSkillDir]
+  while (stack.length > 0) {
+    const dir = stack.pop()
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) stack.push(full)
+      else if (entry.name.endsWith('.md')) {
+        fs.writeFileSync(full, rewriteHostAgnosticMarkdown(fs.readFileSync(full, 'utf8')))
+      }
     }
-  }
-  const bugbot = path.join(destSkillDir, 'references', 'bugbot-triage.md')
-  if (fs.existsSync(bugbot)) {
-    fs.writeFileSync(bugbot, rewriteHostAgnosticMarkdown(fs.readFileSync(bugbot, 'utf8')))
   }
 }
 
-function skillsOutDir(outFlag) {
-  return path.resolve(outFlag || CATALOG_SKILLS_DIR)
+function outParent(outFlag, defaultDir = CATALOG_SKILLS_DIR) {
+  return path.resolve(outFlag || defaultDir)
 }
 
 function isPublishedCatalog(outDir) {
@@ -216,7 +257,7 @@ function listPrincipleLeaves(fromDir) {
   return names
 }
 
-function importSkill(fromDir, skillName, outFlag) {
+function importSkill(fromDir, skillName, outFlag, options = {}) {
   if (!fromDir) fail('missing --from')
   if (!skillName) fail('missing --skill')
 
@@ -228,13 +269,11 @@ function importSkill(fromDir, skillName, outFlag) {
 
   const sourceText = fs.readFileSync(sourceFile, 'utf8')
   const { fields, body } = parseFrontmatter(sourceText, sourceFile)
-  const destSkillDir = path.join(skillsOutDir(outFlag), skillName)
+  const destSkillDir = path.join(outParent(outFlag, options.parentDir ?? CATALOG_SKILLS_DIR), skillName)
   fs.mkdirSync(destSkillDir, { recursive: true })
   fs.writeFileSync(path.join(destSkillDir, 'SKILL.md'), renderSkillMarkdown(skillName, fields, body))
   copySiblingDirs(sourceSkillDir, destSkillDir)
-  if (skillName === 'poteto-mode') {
-    rewritePotetoModeHostFiles(destSkillDir)
-  }
+  rewriteDestMarkdown(destSkillDir)
 }
 
 function renderPrinciplesSkill(leaves) {
@@ -269,7 +308,7 @@ function importPrinciplesPack(fromDir, outFlag) {
   }
 
   const folders = listPrincipleLeaves(sourceRoot)
-  const destSkillsDir = skillsOutDir(outFlag)
+  const destSkillsDir = outParent(outFlag)
   if (isPublishedCatalog(destSkillsDir) && folders.length !== PRINCIPLE_LEAF_COUNT) {
     fail(`expected ${PRINCIPLE_LEAF_COUNT} principle-* leaves, found ${folders.length}`)
   }
@@ -295,51 +334,85 @@ function importPrinciplesPack(fromDir, outFlag) {
   fs.writeFileSync(path.join(destPackDir, 'SKILL.md'), renderPrinciplesSkill(leaves))
 }
 
-function loadForbiddenPhrases() {
-  if (!fs.existsSync(FORBIDDEN_PHRASES_FILE)) {
-    fail(`missing ${path.relative(REPO_ROOT, FORBIDDEN_PHRASES_FILE)}`)
+function importOptionalPack(fromDir, outFlag) {
+  if (!fromDir) fail('missing --from')
+  for (const name of loadLines(OPTIONAL_SKILLS_FILE)) {
+    importSkill(fromDir, name, outFlag, {
+      parentDir: OPTIONAL_DIR,
+      rewriteMarkdown: true,
+    })
+  }
+}
+
+function importDefaultPack(fromDir, outFlag) {
+  if (!fromDir) fail('missing --from')
+  for (const name of loadLines(DEFAULT_PSTACK_SKILLS_FILE)) {
+    importSkill(fromDir, name, outFlag, {
+      rewriteMarkdown: true,
+    })
+  }
+}
+
+function loadLines(file) {
+  if (!fs.existsSync(file)) {
+    fail(`missing ${path.relative(REPO_ROOT, file)}`)
   }
   return fs
-    .readFileSync(FORBIDDEN_PHRASES_FILE, 'utf8')
+    .readFileSync(file, 'utf8')
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line !== '')
 }
 
+function loadForbiddenPhrases() {
+  return loadLines(FORBIDDEN_PHRASES_FILE)
+}
+
+function checkSkillFile(skillFile, folderName, forbidden) {
+  const rel = path.relative(REPO_ROOT, skillFile)
+  const text = fs.readFileSync(skillFile, 'utf8')
+  const { fields } = parseFrontmatter(text, rel)
+  let failed = false
+  for (const key of Object.keys(fields)) {
+    if (!ALLOWED_KEYS.has(key)) {
+      console.error(`${rel}: ${key}`)
+      failed = true
+    }
+  }
+  if (fields.name !== folderName) {
+    console.error(`${rel}: name`)
+    failed = true
+  }
+  for (const phrase of forbidden) {
+    if (text.includes(phrase)) {
+      console.error(`${rel}: ${phrase}`)
+      failed = true
+    }
+  }
+  return failed
+}
+
+function checkCatalogDir(catalogDir, forbidden) {
+  let failed = false
+  for (const entry of fs.readdirSync(catalogDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const skillFile = path.join(catalogDir, entry.name, 'SKILL.md')
+    if (!fs.existsSync(skillFile)) continue
+    if (checkSkillFile(skillFile, entry.name, forbidden)) failed = true
+  }
+  return failed
+}
+
 function checkSkills() {
-  const skillsDir = CATALOG_SKILLS_DIR
-  if (!fs.existsSync(skillsDir)) {
-    fail(`missing skills directory: ${skillsDir}`)
+  if (!fs.existsSync(CATALOG_SKILLS_DIR)) {
+    fail(`missing skills directory: ${CATALOG_SKILLS_DIR}`)
   }
 
   const forbidden = loadForbiddenPhrases()
-  let failed = false
-  const entries = fs.readdirSync(skillsDir, { withFileTypes: true })
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue
-    const skillFile = path.join(skillsDir, entry.name, 'SKILL.md')
-    if (!fs.existsSync(skillFile)) continue
-    const rel = path.relative(REPO_ROOT, skillFile)
-    const text = fs.readFileSync(skillFile, 'utf8')
-    const { fields } = parseFrontmatter(text, rel)
-    for (const key of Object.keys(fields)) {
-      if (!ALLOWED_KEYS.has(key)) {
-        console.error(`${rel}: ${key}`)
-        failed = true
-      }
-    }
-    if (fields.name !== entry.name) {
-      console.error(`${rel}: name`)
-      failed = true
-    }
-    for (const phrase of forbidden) {
-      if (text.includes(phrase)) {
-        console.error(`${rel}: ${phrase}`)
-        failed = true
-      }
-    }
+  let failed = checkCatalogDir(CATALOG_SKILLS_DIR, forbidden)
+  if (fs.existsSync(OPTIONAL_DIR)) {
+    failed = checkCatalogDir(OPTIONAL_DIR, forbidden) || failed
   }
-
   if (failed) process.exit(1)
 }
 
@@ -357,8 +430,14 @@ if (isMainModule()) {
   if (args.check) {
     checkSkills()
   } else if (args.pack) {
-    if (args.pack !== 'principles') fail(`unknown pack: ${args.pack}`)
-    importPrinciplesPack(args.from, args.out)
+    const importers = {
+      principles: importPrinciplesPack,
+      optional: importOptionalPack,
+      default: importDefaultPack,
+    }
+    const importer = importers[args.pack]
+    if (!importer) fail(`unknown pack: ${args.pack}`)
+    importer(args.from, args.out)
   } else if (args.from || args.skill) {
     importSkill(args.from, args.skill, args.out)
   } else {
