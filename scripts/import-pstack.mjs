@@ -10,8 +10,8 @@ const HOST_AGNOSTIC_REPLACES = [
   ['- `readonly`: `true`', '- Do not write to the parent workspace'],
   ['Launch all reviewers in a single message using the Task tool.', 'Spawn all reviewers in one turn.'],
   ["the Task tool's error message", 'the spawn error'],
-  ['`~/.cursor/rules/pstack-models.mdc`', 'the host configured-models file'],
-  ['~/.cursor/rules/pstack-models.mdc', 'the host configured-models file'],
+  ['`~/.cursor/rules/pstack-models.mdc`', '`.agents/models.md`'],
+  ['~/.cursor/rules/pstack-models.mdc', '`.agents/models.md`'],
   ['.cursor/skills/', '.agents/skills/'],
   [
     'When a worker must start from a non-default pushed branch, pass `cloud_base_branch`.',
@@ -64,6 +64,55 @@ const OPTIONAL_DIR = path.join(REPO_ROOT, 'optional')
 const OPTIONAL_SKILLS_FILE = path.join(REPO_ROOT, 'scripts/optional-skills.txt')
 const DEFAULT_PSTACK_SKILLS_FILE = path.join(REPO_ROOT, 'scripts/default-pstack-skills.txt')
 const FORBIDDEN_PHRASES_FILE = path.join(REPO_ROOT, 'scripts/forbidden-host-phrases.txt')
+const FORBIDDEN_MODEL_SLUGS_FILE = path.join(REPO_ROOT, 'scripts/forbidden-model-slugs.txt')
+const MODEL_SLUG_PREFIXES = ['claude-fable-', 'claude-opus-', 'gpt-5.6-sol', 'grok-4.6-']
+const MODEL_BINDING_REPLACES = [
+  ['the host configured-models file', '`.agents/models.md`'],
+  [
+    'Use `arena runners` from `.agents/models.md` when present. Otherwise default to one each on `claude-fable-5-1-thinking-max`, `gpt-5.6-sol-max`, `grok-4.6-fast-xhigh`, `claude-opus-5-thinking-xhigh`. Spawn more when the arena covers multiple design directions. Same model N times when the work is generation-bound rather than judgment-sensitive.',
+    'Use `arena runners` from `.agents/models.md` when present, one candidate per entry. If that file has no line, spawn 3 candidates with no model. Spawn more when the arena covers multiple design directions. Same model N times when the file lists one model or the work is generation-bound rather than judgment-sensitive.',
+  ],
+  [
+    "choose one model from the `arena cross-judge pool` in `.agents/models.md` when present. Otherwise use `claude-fable-5-1-thinking-max`, `gpt-5.6-sol-max`, `grok-4.6-fast-xhigh`, `claude-opus-5-thinking-xhigh`. Prefer a different model family from the parent's.",
+    "choose one model from the `arena cross-judge pool` in `.agents/models.md` when present. If that file has no line, omit `model`. Prefer a different model family from the parent's when the file lists more than one.",
+  ],
+  [
+    'Use your configured architect runners (defaults `claude-fable-5-1-thinking-max`, `gpt-5.6-sol-max`, `grok-4.6-fast-xhigh`, `claude-opus-5-thinking-xhigh`).',
+    'Use your configured architect runners from `.agents/models.md` when present. Otherwise inherit the parent for each runner.',
+  ],
+  [
+    'Pick the worker model from `swarm workers` in `.agents/models.md` when present. Otherwise use `grok-4.6-fast-xhigh`.',
+    'Pick the worker model from `swarm workers` in `.agents/models.md` when present. Otherwise inherit the parent model.',
+  ],
+  [
+    'Use the `interrogate reviewers` list from `.agents/models.md` when present, one reviewer per entry, extending or shrinking the Reviewer A/B/C/D labels below to the configured entry count. Otherwise use the table defaults.',
+    'Use the `interrogate reviewers` list from `.agents/models.md` when present, one reviewer per entry, extending or shrinking the Reviewer A/B/C/D labels to the configured entry count. If that file has no line, spawn 2 reviewers with no model and say they share the parent model.',
+  ],
+  [
+    '- `model`: the configured `interrogate reviewers` entry, or the table default with no configured line',
+    '- `model`: the configured `interrogate reviewers` entry, or omit `model` when that file has no line',
+  ],
+  [
+    'If a model slug is rejected as unresolvable when you try to spawn the subagent, check the valid slugs in the spawn error, pick the closest equivalent (prefer the highest-reasoning tier of the same family), spawn with the valid slug, and open a separate PR to update the configured value or default table. Do not block the review on the slug issue. If the configured value is `inherit-parent` or `auto`, omit `model` instead. Never treat those aliases as broken slugs or enter this fallback for them.',
+    'If a configured slug is rejected as unresolvable, check the valid slugs in the spawn error, pick the closest equivalent or omit `model`, and update `.agents/models.md` if that file named the bad slug. Do not block the review. If the configured value is `inherit`, `inherit-parent`, or `auto`, omit `model`. Never treat those aliases as broken slugs.',
+  ],
+  [
+    '- `model`: your configured why-investigators model',
+    '- `model`: `why investigators` from `.agents/models.md` when present. Otherwise omit `model`',
+  ],
+  [
+    '- `model`: your configured why-synthesizer model',
+    '- `model`: `why synthesizer` from `.agents/models.md` when present. Otherwise omit `model`',
+  ],
+  [
+    '- `model`: your configured how-explorer model',
+    '- `model`: `how explorer` from `.agents/models.md` when present. Otherwise omit `model`',
+  ],
+  [
+    '- `model`: your configured how-explainer model',
+    '- `model`: `how explainer` from `.agents/models.md` when present. Otherwise omit `model`',
+  ],
+]
 const PRINCIPLE_LEAF_COUNT = 23
 const PRINCIPLES_PACK_DESCRIPTION =
   'Apply named engineering principles such as laziness, prove-it-works, and model-the-domain. Use when choosing a design, sequencing work, reviewing a diff, or the user names a principle.'
@@ -161,11 +210,41 @@ function copySiblingDirs(sourceSkillDir, destSkillDir) {
   }
 }
 
+function isForbiddenModelSlug(value) {
+  return MODEL_SLUG_PREFIXES.some((prefix) => value.includes(prefix))
+}
+
+function applyModelBindingReplaces(text) {
+  let out = text
+  for (const [needle, replacement] of MODEL_BINDING_REPLACES) {
+    out = out.split(needle).join(replacement)
+  }
+  return out
+}
+
+function rewriteModelBindings(text) {
+  let out = text.replace(/Ten lanes on `[^`]+` at the PR head/g, 'Ten lanes at the PR head')
+  out = applyModelBindingReplaces(out)
+  out = out.replace(/ \(defaults? `[^`]+`(?:, `[^`]+`)*\)/g, '')
+  out = applyModelBindingReplaces(out)
+  out = out.replace(
+    /\n\| Subagent \| Default model \|\r?\n\|[-| ]+\|\r?\n(?:\| Reviewer [A-Z] \| `[^`]+` \|\r?\n)+/,
+    '\n',
+  )
+  out = out.replace(/\n{3,}/g, '\n\n')
+  out = out.replace(/`[^`]+`/g, (match) => {
+    const inner = match.slice(1, -1)
+    return isForbiddenModelSlug(inner) ? '`inherit`' : match
+  })
+  return out
+}
+
 export function rewriteHostAgnosticMarkdown(text) {
   let out = text
   for (const [needle, replacement] of HOST_AGNOSTIC_REPLACES) {
     out = out.split(needle).join(replacement)
   }
+  out = rewriteModelBindings(out)
   out = out.split("Use the **create-skill** skill (Cursor's built-in for authoring SKILL.md files)").join(
     'Author SKILL.md per the Agent Skills spec (name, description, progressive disclosure)',
   )
@@ -217,7 +296,7 @@ function rewriteDestMarkdown(destSkillDir) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name)
       if (entry.isDirectory()) stack.push(full)
-      else if (entry.name.endsWith('.md')) {
+      else if (entry.name.endsWith('.md') || entry.name === 'check-plan.mjs') {
         fs.writeFileSync(full, rewriteHostAgnosticMarkdown(fs.readFileSync(full, 'utf8')))
       }
     }
@@ -368,6 +447,21 @@ function loadForbiddenPhrases() {
   return loadLines(FORBIDDEN_PHRASES_FILE)
 }
 
+function loadForbiddenModelSlugs() {
+  return loadLines(FORBIDDEN_MODEL_SLUGS_FILE)
+}
+
+function walkTextFiles(dir, acc = []) {
+  if (!fs.existsSync(dir)) return acc
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name === 'bun.lock') continue
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) walkTextFiles(full, acc)
+    else if (/\.(md|mjs|ts|js|sh)$/.test(entry.name)) acc.push(full)
+  }
+  return acc
+}
+
 function checkSkillFile(skillFile, folderName, forbidden) {
   const rel = path.relative(REPO_ROOT, skillFile)
   const text = fs.readFileSync(skillFile, 'utf8')
@@ -403,16 +497,38 @@ function checkCatalogDir(catalogDir, forbidden) {
   return failed
 }
 
+function checkForbiddenPhrasesInFiles(files, phrases) {
+  let failed = false
+  for (const file of files) {
+    const rel = path.relative(REPO_ROOT, file)
+    const text = fs.readFileSync(file, 'utf8')
+    for (const phrase of phrases) {
+      if (text.includes(phrase)) {
+        console.error(`${rel}: ${phrase}`)
+        failed = true
+      }
+    }
+  }
+  return failed
+}
+
 function checkSkills() {
   if (!fs.existsSync(CATALOG_SKILLS_DIR)) {
     fail(`missing skills directory: ${CATALOG_SKILLS_DIR}`)
   }
 
   const forbidden = loadForbiddenPhrases()
+  const modelSlugs = loadForbiddenModelSlugs()
   let failed = checkCatalogDir(CATALOG_SKILLS_DIR, forbidden)
   if (fs.existsSync(OPTIONAL_DIR)) {
     failed = checkCatalogDir(OPTIONAL_DIR, forbidden) || failed
   }
+  const slugFiles = [
+    ...walkTextFiles(CATALOG_SKILLS_DIR),
+    ...walkTextFiles(OPTIONAL_DIR),
+    ...walkTextFiles(path.join(REPO_ROOT, 'templates')),
+  ]
+  failed = checkForbiddenPhrasesInFiles(slugFiles, modelSlugs) || failed
   if (failed) process.exit(1)
 }
 

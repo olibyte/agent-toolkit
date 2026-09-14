@@ -35,21 +35,14 @@ Write one clear paragraph. If you're unsure about the intent, ask the user befor
 
 ## Step 3, Spawn Reviewers
 
-Spawn all reviewers in one turn. Use the `interrogate reviewers` list from the host configured-models file when present, one reviewer per entry, extending or shrinking the Reviewer A/B/C/D labels below to the configured entry count. Otherwise use the table defaults.
-
-| Subagent | Default model |
-|----------|---------------|
-| Reviewer A | `claude-fable-5-1-thinking-max` |
-| Reviewer B | `gpt-5.6-sol-max` |
-| Reviewer C | `grok-4.6-fast-xhigh` |
-| Reviewer D | `claude-opus-5-thinking-xhigh` |
+Spawn all reviewers in one turn. Use the `interrogate reviewers` list from `.agents/models.md` when present, one reviewer per entry, extending or shrinking the Reviewer A/B/C/D labels to the configured entry count. If that file has no line, spawn 2 reviewers with no model and say they share the parent model.
 
 For each reviewer:
 - the host's general-purpose subagent
-- `model`: the configured `interrogate reviewers` entry, or the table default with no configured line
+- `model`: the configured `interrogate reviewers` entry, or omit `model` when that file has no line
 - Do not write to the parent workspace
 
-If a model slug is rejected as unresolvable when you try to spawn the subagent, check the valid slugs in the spawn error, pick the closest equivalent (prefer the highest-reasoning tier of the same family), spawn with the valid slug, and open a separate PR to update the configured value or default table. Do not block the review on the slug issue. If the configured value is `inherit-parent` or `auto`, omit `model` instead. Never treat those aliases as broken slugs or enter this fallback for them.
+If a configured slug is rejected as unresolvable, check the valid slugs in the spawn error, pick the closest equivalent or omit `model`, and update `.agents/models.md` if that file named the bad slug. Do not block the review. If the configured value is `inherit`, `inherit-parent`, or `auto`, omit `model`. Never treat those aliases as broken slugs.
 
 Read `references/reviewer-prompt.md` and fill in the template with:
 1. The stated intent

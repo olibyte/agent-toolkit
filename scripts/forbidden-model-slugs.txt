@@ -1,0 +1,6 @@
+claude-fable-
+claude-opus-
+gpt-5.6-sol
+grok-4.6-
+pstack-models.mdc
+the host configured-models file
