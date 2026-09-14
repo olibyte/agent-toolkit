@@ -47,6 +47,33 @@ Invoke the same way as the default skills. Codex: `$swarm`. Claude Code, Cursor,
 
 After install they sit next to the default skills. poteto-mode calls swarm, interrogate, and figure-it-out when those names are present, and skips with a reason when they are not.
 
+## Install other catalogs
+
+This package is one catalog. Add others with a second `npx skills add`. Each command is one GitHub source. Leave off `-y` so you can skip skills you do not want.
+
+**Matt Pocock's skills.** Planning, grilling, specs, and issue-tracker workflows. Skip `handoff`, `tdd`, and `teach`. This catalog already ships those names. Source: [mattpocock/skills](https://github.com/mattpocock/skills).
+
+```bash
+npx skills@latest add mattpocock/skills \
+  -a claude-code -a cursor -a codex -a antigravity -a antigravity-cli
+```
+
+Then run `setup-matt-pocock-skills` once in the project. Codex: `$setup-matt-pocock-skills`. Claude Code, Cursor, and Antigravity: `/setup-matt-pocock-skills`.
+
+**Vercel agent skills.** React and Next.js performance rules, web design audits, and related Vercel workflows. Source: [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills).
+
+```bash
+npx skills@latest add vercel-labs/agent-skills \
+  -a claude-code -a cursor -a codex -a antigravity -a antigravity-cli
+```
+
+**Next.js workflow skills.** Install these only in a Next.js app. Next.js 16.3 and later writes framework docs into `AGENTS.md`. The skills add workflows such as `next-dev-loop`. Source: [vercel/next.js skills](https://github.com/vercel/next.js/tree/canary/skills).
+
+```bash
+npx skills@latest add vercel/next.js \
+  -a claude-code -a cursor -a codex -a antigravity -a antigravity-cli
+```
+
 ## Commit
 
 Commit these paths so the team shares the same skills and baseline:
