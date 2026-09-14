@@ -189,6 +189,9 @@ Cursor's built-in babysit skill
 after a Cursor restart
 use `origin pr ...` for view
     - indented survivor
+Use `arena runners` from ~/.cursor/rules/pstack-models.mdc when present. Otherwise default to one each on `claude-fable-5-1-thinking-max`, `gpt-5.6-sol-max`, `grok-4.6-fast-xhigh`, `claude-opus-5-thinking-xhigh`. Spawn more when the arena covers multiple design directions. Same model N times when the work is generation-bound rather than judgment-sensitive.
+using your configured feature model (default `grok-4.6-fast-xhigh`)
+Ten lanes on `grok-4.6-fast-xhigh` at the PR head
 EOF
 cat > "$TMP/src-poteto/poteto-mode/references/bugbot-triage.md" <<'EOF'
 Use this when Bugbot or review-automation comments arrive.
@@ -256,6 +259,18 @@ if ! grep -Fq 'Bugbot or other automated review comments' "$TMP/out-poteto/potet
 fi
 if grep -Fq 'subagent_type' "$TMP/out-poteto/poteto-mode/SKILL.md"; then
   echo "poteto-mode SKILL.md still has subagent_type" >&2
+  exit 1
+fi
+if grep -Fq 'claude-fable-' "$SAMPLE" || grep -Fq 'grok-4.6-' "$SAMPLE" || grep -Fq 'pstack-models.mdc' "$SAMPLE"; then
+  echo "poteto-mode playbook still has a hardcoded model slug" >&2
+  exit 1
+fi
+grep -q '.agents/models.md' "$SAMPLE"
+grep -q 'spawn 3 candidates with no model' "$SAMPLE"
+grep -q 'Ten lanes at the PR head' "$SAMPLE"
+grep -q 'using your configured feature model' "$SAMPLE"
+if grep -Fq '(default ' "$SAMPLE"; then
+  echo "poteto-mode playbook still has a default model parenthetical" >&2
   exit 1
 fi
 
@@ -502,7 +517,7 @@ if grep -Fq '.cursor/skills/' "$TMP/out-optional/create-verification-skill/SKILL
   echo "optional create-verification-skill fixture still has .cursor/skills/" >&2
   exit 1
 fi
-grep -q 'the host configured-models file' "$TMP/out-optional/swarm/SKILL.md"
+grep -q '.agents/models.md' "$TMP/out-optional/swarm/SKILL.md"
 grep -q '.agents/skills/' "$TMP/out-optional/create-verification-skill/SKILL.md"
 
 node "$ROOT/scripts/import-pstack.mjs" --from "$PSTACK_SKILLS" --pack optional

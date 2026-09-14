@@ -18,7 +18,7 @@ npx skills@latest add /absolute/path/to/agent-toolkit \
   -a claude-code -a cursor -a codex -a antigravity -a antigravity-cli -y
 ```
 
-Then copy `templates/AGENTS.md` to the consumer repo root if `AGENTS.md` is missing. Copy `templates/CLAUDE.md` to `CLAUDE.md` if that file is missing.
+Then copy `templates/AGENTS.md` to the consumer repo root if `AGENTS.md` is missing. Copy `templates/CLAUDE.md` to `CLAUDE.md` if that file is missing. Copy `templates/models.md` to `.agents/models.md` only if you want to pin models for subagents. Skip that file to use the current chat model.
 
 ## Poteto mode
 
@@ -56,6 +56,8 @@ Commit these paths so the team shares the same skills and baseline:
 - `skills-lock.json`
 - `AGENTS.md`
 - `CLAUDE.md`
+
+Keep `.agents/models.md` local when the team uses more than one coding app or does not share the same models.
 
 ## Switch tools
 

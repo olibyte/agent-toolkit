@@ -21,11 +21,11 @@ When in doubt, take the simple path.
 
 ## Step 2a. Explore (complex questions only)
 
-Decompose the question into 2 to 4 exploration angles, each a distinct slice of the subsystem. Spawn all explorers in one turn. Each explorer is a subagent with no write access to the parent workspace. Use the host's general-purpose agent type if it has one. Prefer a fast model when the host lets you pick. Each explorer gets the prompt in `references/explorer-prompt.md` with its angle filled in. Then go to Step 3.
+Decompose the question into 2 to 4 exploration angles, each a distinct slice of the subsystem. Spawn all explorers in one turn. Each explorer is a subagent with no write access to the parent workspace. Use the host's general-purpose agent type if it has one. Use `how explorer` from `.agents/models.md` when present. Otherwise omit `model`. Each explorer gets the prompt in `references/explorer-prompt.md` with its angle filled in. Then go to Step 3.
 
 ## Step 2b. Direct Explain (simple questions)
 
-Spawn one subagent that explores and explains in one pass. Same: no write access, general-purpose type, prefer a stronger judgment model when the host lets you pick. Build its prompt from `references/explainer-prompt.md` without the explorer-findings section. Go to Step 4.
+Spawn one subagent that explores and explains in one pass. Same: no write access, general-purpose type. Use `how explainer` from `.agents/models.md` when present. Otherwise omit `model`. Build its prompt from `references/explainer-prompt.md` without the explorer-findings section. Go to Step 4.
 
 ## Step 3. Synthesize (complex questions only)
 

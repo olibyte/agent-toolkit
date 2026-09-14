@@ -90,9 +90,11 @@ Read the matching file under the `principles` skill `references/` directory in f
 
 Playbook code-writing delegates and ad-hoc helpers: spawn a subagent that receives `references/poteto-agent.md` plus this SKILL.md. Routed workflow skills (how, why, interrogate, reflect, swarm) follow those skills' own spawn rules when those skills are installed. Do not override them.
 
-Prefer background or async subagents when the host supports it so the parent can continue. Prefer file pointers over inlined dumps. Read-only subagents must not write the parent workspace. When the host lets you pick models: fast model for mechanical code, stronger model for judgment and prose, strongest model for gnarly concurrency or cross-cutting design. If you cannot pick, inherit the parent model.
+Prefer background or async subagents when the host supports it so the parent can continue. Prefer file pointers over inlined dumps. Read-only subagents must not write the parent workspace.
 
-You own every subagent's work. Review the diff and write your own summary. Do not pass through what it said. Prefer a fresh subagent with consolidated scope over a chained resume. A second opinion is the same prompt against a different model when the host allows it.
+Read `.agents/models.md` when that file exists. Each playbook and routed skill names a role (`feature`, `hillclimb`, `arena runners`). Use that line as the spawn model. A list means one subagent per entry. `inherit` or `auto` means omit `model`. If the file is missing, or the host cannot pick a model, omit `model`. Do not hardcode a vendor model name.
+
+You own every subagent's work. Review the diff and write your own summary. Do not pass through what it said. Prefer a fresh subagent with consolidated scope over a chained resume. A second opinion is the same prompt against a different model when `.agents/models.md` lists more than one family.
 
 ## Writing the reply
 
