@@ -1,6 +1,6 @@
 # agent-toolkit
 
-Curated Agent Skills you drop into a project. They work in Claude Code, Cursor, Codex CLI, and Antigravity CLI.
+Curated Agent Skills you drop into a project. They work in Claude Code, Cursor, Codex CLI, and Antigravity CLI. Stay tuned for OpenCode, Pi and all the other smash hits.
 
 ## Install
 
