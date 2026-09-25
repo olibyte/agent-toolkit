@@ -1,34 +1,29 @@
 # agent-toolkit
 
-Curated Agent Skills you drop into a project. They work in Claude Code, Cursor, Codex CLI, and Antigravity CLI. Stay tuned for OpenCode, Pi and all the other smash hits.
+Curated Agent Skills for Claude Code, Cursor, Codex CLI, and Antigravity CLI.
 
 ## Install
-
-Install into a project (not `-g`):
 
 ```bash
 npx skills@latest add olibyte/agent-toolkit \
   -a claude-code -a cursor -a codex -a antigravity -a antigravity-cli -y
 ```
 
-To install from a local clone, use the same `-a` flags with the clone path:
+Install into the project. A local clone uses the clone path in place of `olibyte/agent-toolkit`.
 
-```bash
-npx skills@latest add /absolute/path/to/agent-toolkit \
-  -a claude-code -a cursor -a codex -a antigravity -a antigravity-cli -y
-```
+Copy `templates/AGENTS.md` and `templates/CLAUDE.md` to the repo root when those files are missing. Copy `templates/models.md` to `.agents/models.md` when you want to pin subagent models.
 
-Then copy `templates/AGENTS.md` to the consumer repo root if `AGENTS.md` is missing. Copy `templates/CLAUDE.md` to `CLAUDE.md` if that file is missing. Copy `templates/models.md` to `.agents/models.md` only if you want to pin models for subagents. Skip that file to use the current chat model.
+Commit `.agents/skills/`, `.claude/skills/`, `skills-lock.json`, `AGENTS.md`, and `CLAUDE.md`. Leave `.agents/models.md` uncommitted when the team does not share models. Run `handoff` before switching tools.
 
 ## Poteto mode
 
-`poteto-mode` is the working style in this catalog. It came from [pstack](https://github.com/cursor/plugins/tree/main/pstack). An agent that applies it matches the task to a playbook, names the data shape before it writes code, delegates implementation, and checks the real artifact. Casual turns skip it.
+Working style from [pstack](https://github.com/cursor/plugins/tree/main/pstack): match a playbook, name the data shape, delegate the implementation, check the real artifact. Casual turns skip it.
 
-Invoke it when the work needs that rigor. Codex: `$poteto-mode`. Claude Code, Cursor, and Antigravity: `/poteto-mode`. The agent instructions and playbooks live in [`skills/poteto-mode/SKILL.md`](skills/poteto-mode/SKILL.md).
+Codex: `$poteto-mode`. Claude Code, Cursor, and Antigravity: `/poteto-mode`. Playbooks live in [`skills/poteto-mode/SKILL.md`](skills/poteto-mode/SKILL.md).
 
 ## Optional skills
 
-A default install does not include these. They live under `optional/` so the catalog a Codex session sees stays small. Install them with `--full-depth` and the skill names you want. Drop `-s` flags you do not need.
+These live under `optional/` so a default Codex session stays small. Drop any `-s` you do not need.
 
 ```bash
 npx skills@latest add olibyte/agent-toolkit --full-depth \
@@ -37,58 +32,41 @@ npx skills@latest add olibyte/agent-toolkit --full-depth \
   -a claude-code -a cursor -a codex -a antigravity -a antigravity-cli -y
 ```
 
-Invoke the same way as the default skills. Codex: `$swarm`. Claude Code, Cursor, and Antigravity: `/swarm`. Same pattern for each name.
+Invoke as `$name` or `/name`.
 
-- **swarm.** Fan out N workers, wait, return one report. Coverage slices or a race.
-- **interrogate.** Several models review the same diff. You get a verdict. It does not apply the fixes.
-- **figure-it-out.** No bundled playbook fits. The agent designs a playbook first, then runs it.
-- **create-verification-skill.** Writes a project-local `verify-<app>` skill under `.agents/skills/` that drives the real UI or CLI.
-- **maintain-verification-skill.** Re-reads that feature map against source and a live pass, then ships at most one PR of proven corrections.
+- **swarm.** Fan out workers, wait, return one report.
+- **interrogate.** Several models review one diff and return a verdict. The diff stays as it is.
+- **figure-it-out.** Write a playbook when none fits, then run it.
+- **create-verification-skill.** Write a project-local `verify-<app>` skill under `.agents/skills/`.
+- **maintain-verification-skill.** Recheck that map against source and a live pass, then open at most one PR of proven corrections.
 
-After install they sit next to the default skills. poteto-mode calls swarm, interrogate, and figure-it-out when those names are present, and skips with a reason when they are not.
+poteto-mode calls swarm, interrogate, and figure-it-out when they are installed, and skips them with a reason when they are absent.
 
-## Install other catalogs
+## Recommended: quota-axi
 
-This package is one catalog. Add others with a second `npx skills add`. Each command is one GitHub source. Leave off `-y` so you can skip skills you do not want.
+[Kun Chen](https://github.com/kunchenguid)'s [quota-axi](https://github.com/kunchenguid/quota-axi) reports local subscription quota windows (Claude, Codex, Cursor, Copilot, and others) so the agent can see remaining runway before it spends more. The report is data only.
 
-**Matt Pocock's skills.** Planning, grilling, specs, and issue-tracker workflows. Skip `handoff`, `tdd`, and `teach`. This catalog already ships those names. Source: [mattpocock/skills](https://github.com/mattpocock/skills).
+![quota-axi terminal view of Claude, Codex, Antigravity, and Cursor quota](docs/quota-axi-tui.jpg)
 
 ```bash
-npx skills@latest add mattpocock/skills \
+npx skills@latest add kunchenguid/quota-axi --skill quota-axi -g \
   -a claude-code -a cursor -a codex -a antigravity -a antigravity-cli
 ```
 
-Then run `setup-matt-pocock-skills` once in the project. Codex: `$setup-matt-pocock-skills`. Claude Code, Cursor, and Antigravity: `/setup-matt-pocock-skills`.
+`-g` installs the skill for every project. Omit it to keep the skill in the current project.
 
-**Vercel agent skills.** React and Next.js performance rules, web design audits, and related Vercel workflows. Source: [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills).
+## Other catalogs
+
+One command per source. Leave off `-y` so you can skip skills. Same `-a` flags as above.
+
+- **[mattpocock/skills](https://github.com/mattpocock/skills).** Planning, grilling, specs, and issue trackers. Skip `handoff`, `tdd`, and `teach` (this catalog already ships them), then run `setup-matt-pocock-skills` once.
+- **[vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills).** React and Next.js performance rules and web design audits.
+- **[vercel/next.js](https://github.com/vercel/next.js/tree/canary/skills).** Next.js workflows such as `next-dev-loop`. Install only in a Next.js app. Next.js 16.3 and later already writes framework docs into `AGENTS.md`.
 
 ```bash
-npx skills@latest add vercel-labs/agent-skills \
+npx skills@latest add <owner/repo> \
   -a claude-code -a cursor -a codex -a antigravity -a antigravity-cli
 ```
-
-**Next.js workflow skills.** Install these only in a Next.js app. Next.js 16.3 and later writes framework docs into `AGENTS.md`. The skills add workflows such as `next-dev-loop`. Source: [vercel/next.js skills](https://github.com/vercel/next.js/tree/canary/skills).
-
-```bash
-npx skills@latest add vercel/next.js \
-  -a claude-code -a cursor -a codex -a antigravity -a antigravity-cli
-```
-
-## Commit
-
-Commit these paths so the team shares the same skills and baseline:
-
-- `.agents/skills/`
-- `.claude/skills/`
-- `skills-lock.json`
-- `AGENTS.md`
-- `CLAUDE.md`
-
-Keep `.agents/models.md` local when the team uses more than one coding app or does not share the same models.
-
-## Switch tools
-
-Chat history does not follow you across tools. Files do. Run `handoff` before you leave.
 
 ## Spec
 
