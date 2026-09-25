@@ -1,0 +1,260 @@
+{
+  "version": 1,
+  "work": {
+    "goal": "Factory v0 end-to-end proof on an ephemeral EC2 worker",
+    "plan": ".factory/plan.md",
+    "tasks": [
+      {
+        "id": "T1",
+        "status": "done",
+        "dependsOn": []
+      },
+      {
+        "id": "T2",
+        "status": "done",
+        "dependsOn": [
+          "T1"
+        ]
+      },
+      {
+        "id": "T3",
+        "status": "done",
+        "dependsOn": [
+          "T1"
+        ]
+      },
+      {
+        "id": "T4",
+        "status": "done",
+        "dependsOn": [
+          "T1"
+        ]
+      },
+      {
+        "id": "T5",
+        "status": "done",
+        "dependsOn": [
+          "T4"
+        ]
+      },
+      {
+        "id": "T6",
+        "status": "done",
+        "dependsOn": [
+          "T2",
+          "T3",
+          "T5"
+        ]
+      },
+      {
+        "id": "T7",
+        "status": "done",
+        "dependsOn": [
+          "T6"
+        ],
+        "evidence": "run 20260925-070547-e6aa opened olibyte/agent-factory-sandbox#1 from the local worker"
+      },
+      {
+        "id": "T8",
+        "status": "done",
+        "dependsOn": [
+          "T5"
+        ]
+      },
+      {
+        "id": "T9",
+        "status": "done",
+        "dependsOn": []
+      },
+      {
+        "id": "T10",
+        "status": "blocked",
+        "dependsOn": [
+          "T8",
+          "T9"
+        ],
+        "blockedOn": "AWS credentials, Slack webhook, GitHub token in SSM"
+      },
+      {
+        "id": "T11",
+        "status": "in_progress",
+        "dependsOn": [
+          "T1",
+          "T2",
+          "T3",
+          "T4",
+          "T5",
+          "T6",
+          "T7",
+          "T8",
+          "T9",
+          "T10"
+        ]
+      }
+    ]
+  },
+  "runs": [
+    {
+      "id": "20260925-070547-e6aa",
+      "state": "completed",
+      "task": {
+        "repo": "olibyte/agent-factory-sandbox",
+        "base": "main",
+        "title": "factory: record proof run",
+        "body": "Controlled change from the Factory v0 end-to-end proof. Safe to close without merging.",
+        "change": {
+          "kind": "shell",
+          "run": "mkdir -p proofs && printf 'run %s\\nbranch %s\\nhost %s\\ntime %s\\n' \"$FACTORY_RUN_ID\" \"$FACTORY_BRANCH\" \"$(hostname)\" \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" > \"proofs/$FACTORY_RUN_ID.txt\""
+        },
+        "verify": [
+          "test -s \"proofs/$FACTORY_RUN_ID.txt\"",
+          "grep -qx \"run $FACTORY_RUN_ID\" \"proofs/$FACTORY_RUN_ID.txt\"",
+          "git diff --quiet HEAD -- README.md"
+        ],
+        "autoMerge": false,
+        "branchPrefix": "factory/"
+      },
+      "branch": "factory/20260925-070547-e6aa",
+      "createdAt": "2026-09-25T07:05:47.796Z",
+      "updatedAt": "2026-09-25T07:05:55.257Z",
+      "history": [
+        {
+          "from": null,
+          "to": "queued",
+          "at": "2026-09-25T07:05:47.796Z",
+          "reason": null
+        },
+        {
+          "from": "queued",
+          "to": "provisioning",
+          "at": "2026-09-25T07:05:47.797Z",
+          "reason": null
+        },
+        {
+          "from": "provisioning",
+          "to": "running",
+          "at": "2026-09-25T07:05:49.243Z",
+          "reason": null
+        },
+        {
+          "from": "running",
+          "to": "verifying",
+          "at": "2026-09-25T07:05:49.320Z",
+          "reason": null
+        },
+        {
+          "from": "verifying",
+          "to": "pr_opened",
+          "at": "2026-09-25T07:05:55.249Z",
+          "reason": "https://github.com/olibyte/agent-factory-sandbox/pull/1"
+        },
+        {
+          "from": "pr_opened",
+          "to": "completed",
+          "at": "2026-09-25T07:05:55.257Z",
+          "reason": null
+        }
+      ],
+      "worker": {
+        "ref": {
+          "kind": "local",
+          "dir": "/var/folders/gj/hp1ng0kd50s51twgmhh2l9lh0000gn/T/agent-factory-20260925-070547-e6aa-aJ7WRw"
+        },
+        "terminatedAt": "2026-09-25T07:05:55.256Z"
+      },
+      "pr": {
+        "number": 1,
+        "url": "https://github.com/olibyte/agent-factory-sandbox/pull/1",
+        "title": "factory: record proof run",
+        "state": "OPEN",
+        "headRefName": "factory/20260925-070547-e6aa",
+        "baseRefName": "main",
+        "isDraft": false,
+        "autoMerge": false
+      },
+      "blocked": null,
+      "error": null
+    },
+    {
+      "id": "20260925-070936-ba02",
+      "state": "completed",
+      "task": {
+        "repo": "olibyte/agent-factory-sandbox",
+        "base": "main",
+        "title": "factory: record proof run",
+        "body": "Controlled change from the Factory v0 end-to-end proof. Safe to close without merging.",
+        "change": {
+          "kind": "shell",
+          "run": "mkdir -p proofs && printf 'run %s\\nbranch %s\\nhost %s\\ntime %s\\n' \"$FACTORY_RUN_ID\" \"$FACTORY_BRANCH\" \"$HOSTNAME\" \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" > \"proofs/$FACTORY_RUN_ID.txt\""
+        },
+        "verify": [
+          "test -s \"proofs/$FACTORY_RUN_ID.txt\"",
+          "grep -qx \"run $FACTORY_RUN_ID\" \"proofs/$FACTORY_RUN_ID.txt\"",
+          "git diff --quiet HEAD -- README.md"
+        ],
+        "autoMerge": false,
+        "branchPrefix": "factory/"
+      },
+      "branch": "factory/20260925-070936-ba02",
+      "createdAt": "2026-09-25T07:09:36.336Z",
+      "updatedAt": "2026-09-25T07:09:43.731Z",
+      "history": [
+        {
+          "from": null,
+          "to": "queued",
+          "at": "2026-09-25T07:09:36.336Z",
+          "reason": null
+        },
+        {
+          "from": "queued",
+          "to": "provisioning",
+          "at": "2026-09-25T07:09:36.337Z",
+          "reason": null
+        },
+        {
+          "from": "provisioning",
+          "to": "running",
+          "at": "2026-09-25T07:09:38.140Z",
+          "reason": null
+        },
+        {
+          "from": "running",
+          "to": "verifying",
+          "at": "2026-09-25T07:09:38.177Z",
+          "reason": null
+        },
+        {
+          "from": "verifying",
+          "to": "pr_opened",
+          "at": "2026-09-25T07:09:43.721Z",
+          "reason": "https://github.com/olibyte/agent-factory-sandbox/pull/2"
+        },
+        {
+          "from": "pr_opened",
+          "to": "completed",
+          "at": "2026-09-25T07:09:43.731Z",
+          "reason": null
+        }
+      ],
+      "worker": {
+        "ref": {
+          "kind": "local",
+          "dir": "/var/folders/gj/hp1ng0kd50s51twgmhh2l9lh0000gn/T/agent-factory-20260925-070936-ba02-hyYnRn"
+        },
+        "terminatedAt": "2026-09-25T07:09:43.729Z"
+      },
+      "pr": {
+        "number": 2,
+        "url": "https://github.com/olibyte/agent-factory-sandbox/pull/2",
+        "title": "factory: record proof run",
+        "state": "OPEN",
+        "headRefName": "factory/20260925-070936-ba02",
+        "baseRefName": "main",
+        "isDraft": false,
+        "autoMerge": false
+      },
+      "blocked": null,
+      "error": null
+    }
+  ]
+}

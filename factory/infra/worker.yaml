@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Agent Factory v0 worker prerequisites. Workers have no key pair and no
+  inbound rules, and are driven only through SSM Run Command. They can read
+  SecureString parameters under ParameterPrefix and nothing else in Parameter Store.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC for workers. Its default subnets must assign public IPs (the default VPC does).
+  ParameterPrefix:
+    Type: String
+    Default: /agent-factory
+    AllowedPattern: "^/[A-Za-z0-9_.-]+$"
+    Description: Parameter Store path that holds worker secrets (github-token, optional agent API keys).
+
+Resources:
+  WorkerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: Agent Factory ephemeral worker
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: factory-parameters-only
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: ReadFactorySecrets
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterPrefix}/*
+              - Sid: DenyOtherParameters
+                Effect: Deny
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                  - ssm:GetParameterHistory
+                NotResource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ParameterPrefix}/*
+
+  WorkerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref WorkerRole
+
+  WorkerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Agent Factory workers, egress only
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+          Description: GitHub, package mirrors, and SSM endpoints
+      Tags:
+        - Key: Name
+          Value: agent-factory-worker
+
+Outputs:
+  InstanceProfileName:
+    Value: !Ref WorkerInstanceProfile
+  SecurityGroupId:
+    Value: !GetAtt WorkerSecurityGroup.GroupId
+  ParameterPrefix:
+    Value: !Ref ParameterPrefix
+  WorkerRoleArn:
+    Value: !GetAtt WorkerRole.Arn

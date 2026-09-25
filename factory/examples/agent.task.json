@@ -1,0 +1,11 @@
+{
+  "repo": "olibyte/agent-factory-sandbox",
+  "title": "factory: agent adds a usage section",
+  "change": {
+    "kind": "agent",
+    "harness": "claude-code",
+    "prompt": "Add a short 'Usage' section to README.md explaining that this repository receives Factory proof runs.",
+    "escalationModel": "opus"
+  },
+  "verify": ["grep -q '^## Usage' README.md"]
+}
