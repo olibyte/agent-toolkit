@@ -32,7 +32,7 @@ Factory v0: prove one remote task end to end on an ephemeral EC2 worker. The cha
 
 ## Open PRs
 
-- Factory v0 implementation: see the draft PR from branch `feat/factory-v0` (this repo).
+- Factory v0 implementation: olibyte/agent-toolkit#4 (draft) from `feat/factory-v0`.
 - Sandbox proof PRs: olibyte/agent-factory-sandbox#1 and #2. They are safe to close.
 
 ## Next recommended action
