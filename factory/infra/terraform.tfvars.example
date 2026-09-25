@@ -1,0 +1,4 @@
+region  = "us-east-1"
+profile = "agent-factory"
+# budget_alert_email = "you+aws@example.com"
+# monthly_budget_usd = 20

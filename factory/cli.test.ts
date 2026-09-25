@@ -84,7 +84,7 @@ describe("cleanup", () => {
     await mkdir(dir);
     setTimeout(() => void store.update("run-1", { worker: { ref: { kind: "local", dir }, terminatedAt: null } }), 300);
 
-    const run = await cleanup(store, "run-1", "interrupted by operator", 5_000);
+    const run = await cleanup(store, "run-1", "interrupted by operator", { waitForLaunchMs: 5_000 });
     assert.equal(run.state, "failed");
     assert.notEqual(run.worker?.terminatedAt, null);
     assert.deepEqual(run.error, { phase: "cleanup", message: "interrupted by operator" });

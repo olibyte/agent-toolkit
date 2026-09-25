@@ -8,8 +8,8 @@ Factory v0: prove one remote task end to end on an ephemeral EC2 worker. The cha
 
 ## Completed work
 
-- T1 to T9 are done. The `factory/` package has task-state, notifications (console and Slack webhook), github, worker (local and ec2), the orchestrator, the CLI, and `infra/worker.yaml`. `cfn-lint` passes on the template.
-- `cd factory && npm run check` passes: `tsc` strict and 57 `node:test` tests. They cover state transitions, orchestration (happy path, verify failure, launch and ready failures, blocked, escalation, termination failure, auto-merge), a real git push to a bare origin with a fake `gh`, and the EC2 provider against a scripted fake `aws`.
+- T1 to T9 are done. The `factory/` package has task-state, notifications (console and Slack webhook), github, worker (local and ec2), the orchestrator, the CLI, and Terraform in `infra/`. `terraform validate` passes with Terraform 1.16.4 and AWS provider 6.x.
+- `cd factory && npm run check` passes: `tsc` strict and 59 `node:test` tests. They cover state transitions, orchestration (happy path, verify failure, launch and ready failures, blocked, escalation, termination failure, auto-merge), a real git push to a bare origin with a fake `gh`, and the EC2 provider against a scripted fake `aws`.
 - T7 local proof against real GitHub: runs `20260925-070547-e6aa` and `20260925-070936-ba02` opened olibyte/agent-factory-sandbox#1 and #2. The sandbox is a private, disposable repo created for these proofs.
 - Codex reviewed `factory/` read-only. Two findings were fixed: the GitHub token is now visible only in `prepare` and `publish`, and SIGINT cleanup waits for an in-flight launch. One finding was rejected: the `factory_secret` failure path never echoes the value.
 
@@ -24,11 +24,14 @@ Factory v0: prove one remote task end to end on an ephemeral EC2 worker. The cha
 - Secrets: the worker reads `/agent-factory/github-token` (and optional agent API keys) from SSM Parameter Store, and an IAM Deny blocks every other parameter. The Slack webhook stays on the controller in `FACTORY_SLACK_WEBHOOK_URL`.
 - `.factory/state.json` is committed: `work` is hand-maintained, `runs` is written by the CLI. `.factory/runs/` holds logs and events and is gitignored.
 - Agent changes default to `sonnet` for Claude Code, with one optional escalated retry (`escalationModel`) after a failed verification.
+- The user asked for Terraform, not CloudFormation, so `factory/infra/` replaced the CloudFormation template before anything was deployed. Resources have fixed names (`agent-factory-worker`, `/agent-factory/`), and the CLI finds the security group by name instead of reading Terraform state. State stays local and gitignored for now.
+- AWS access: a dedicated member account under IAM Identity Center, with the `agent-factory` SSO profile. `FACTORY_AWS_PROFILE` scopes that profile to factory commands only, so other tools keep their own AWS settings. No root keys.
 - Known limit: task code runs as root on the worker and could use the instance role to read `/agent-factory/*`. The next hardening step is to run `change` and `verify` as an unprivileged user with IMDS blocked.
 
 ## Blockers
 
-- T10 needs the user. The AWS CLI is not installed, no AWS credentials are configured, and there is no worker GitHub token in SSM and no Slack webhook yet. The exact steps are in `factory/README.md` under "EC2 setup".
+- T12 (user): the only AWS login is root. Follow `factory/README.md` > "AWS access": enable Identity Center, create the factory member account, and run `aws configure sso --profile agent-factory`. The AWS CLI and Terraform are not installed on this machine yet.
+- T10 also needs a Slack webhook and the worker GitHub token in SSM.
 
 ## Open PRs
 
@@ -37,9 +40,9 @@ Factory v0: prove one remote task end to end on an ephemeral EC2 worker. The cha
 
 ## Next recommended action
 
-1. After AWS credentials exist, deploy the stack with `factory/README.md` step 1 and store the worker token with step 2.
-2. Export `FACTORY_SLACK_WEBHOOK_URL`, then run `node factory/cli.ts run factory/examples/proof.task.json --worker ec2 --region <region>`.
-3. Confirm that the instance is `terminated`, that the Slack message arrived, and that the run in `.factory/state.json` is `completed`. Then mark T10 done and update this file.
+1. Once T12 is done: `terraform -chdir=factory/infra apply`, then store the worker token (README "Deploy" steps 1 and 2).
+2. With `FACTORY_AWS_PROFILE` and `FACTORY_SLACK_WEBHOOK_URL` set, run `node factory/cli.ts run factory/examples/proof.task.json --worker ec2`.
+3. Confirm that the instance is `terminated`, that the Slack message arrived, and that the run in `.factory/state.json` is `completed`. Then mark T10 done, update this file, and take PR #4 out of draft.
 
 <!-- factory:last-run:start -->
 ## Last factory run

@@ -64,16 +64,24 @@
       {
         "id": "T9",
         "status": "done",
-        "dependsOn": []
+        "dependsOn": [],
+        "note": "Terraform (CloudFormation draft replaced before any deploy)"
+      },
+      {
+        "id": "T12",
+        "status": "blocked",
+        "dependsOn": [],
+        "blockedOn": "user: Identity Center, factory member account, agent-factory SSO profile"
       },
       {
         "id": "T10",
         "status": "blocked",
         "dependsOn": [
           "T8",
-          "T9"
+          "T9",
+          "T12"
         ],
-        "blockedOn": "AWS credentials, Slack webhook, GitHub token in SSM"
+        "blockedOn": "T12, Slack webhook, GitHub token in SSM"
       },
       {
         "id": "T11",

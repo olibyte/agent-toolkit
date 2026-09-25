@@ -11,12 +11,12 @@ The controller is TypeScript on Node 24 with no runtime dependencies. The worker
 | `github/` | Checkout and publish scripts (branch, commit, push, PR, auto-merge) and PR metadata parsing |
 | `worker/` | Provider interface, phase scripts, `local` and `ec2` providers |
 | `orchestrator.ts`, `cli.ts` | Run driver and command line |
-| `infra/worker.yaml` | CloudFormation for the worker role, instance profile, and security group |
+| `infra/` | Terraform for the worker role, instance profile, security group, and an optional budget |
 
 ## Requirements
 
 - Node 22.18 or later (24 recommended), `git`, and `gh` logged in.
-- For EC2 workers: AWS CLI v2 with credentials for the target account.
+- For EC2 workers: AWS CLI v2 and Terraform 1.6 or later.
 
 ```bash
 cd factory && npm install && npm run check   # tsc --noEmit plus node --test
@@ -49,7 +49,7 @@ From the repo root:
 
 ```bash
 node factory/cli.ts run factory/examples/proof.task.json --worker local      # temp dir on this machine
-node factory/cli.ts run factory/examples/proof.task.json --worker ec2 --region us-east-1
+node factory/cli.ts run factory/examples/proof.task.json --worker ec2
 node factory/cli.ts status [run-id]
 node factory/cli.ts cleanup <run-id>      # terminate a leftover worker, fail an unfinished run
 ```
@@ -64,33 +64,49 @@ The local worker runs agent tasks with permission prompts disabled, on your mach
 
 ## EC2 setup
 
-1. Deploy the worker stack into the default VPC. The stack contains no instances, so it costs nothing while idle.
+### AWS access
+
+Run the factory in its own AWS account with short-lived credentials. Never use root access keys.
+
+1. Sign in as root once. Turn on MFA, and do not create root access keys.
+2. Enable IAM Identity Center. This also creates an AWS Organization. Then create a member account for the factory, for example `agent-factory` with a plus-address email such as `you+agent-factory@gmail.com`.
+3. In Identity Center, create a user for yourself and give it the `AdministratorAccess` permission set on the factory account. A 12-hour session length keeps logins to about one a day.
+4. Locally, run `aws configure sso --profile agent-factory` and choose your worker region. Run `aws sso login --profile agent-factory` whenever the session expires.
+5. Add `export FACTORY_AWS_PROFILE=agent-factory` to `~/.zshenv`. Only factory commands read it, so other tools keep their own AWS settings.
+
+The separate account keeps agent-launched instances, IAM roles, and spend away from everything else. You can close the account to remove it all.
+
+### Deploy
+
+1. Create the worker resources. They cost nothing while idle.
 
    ```bash
-   export AWS_REGION=us-east-1
-   VPC=$(aws ec2 describe-vpcs --filters Name=is-default,Values=true --query 'Vpcs[0].VpcId' --output text)
-   aws cloudformation deploy --stack-name agent-factory --template-file factory/infra/worker.yaml \
-     --parameter-overrides VpcId="$VPC" --capabilities CAPABILITY_IAM
+   brew tap hashicorp/tap && brew install hashicorp/tap/terraform
+   cp factory/infra/terraform.tfvars.example factory/infra/terraform.tfvars   # region, profile, budget email
+   terraform -chdir=factory/infra init
+   terraform -chdir=factory/infra apply
    ```
 
-2. Store a GitHub token for the worker. Use a fine-grained token limited to the target repo, with **Contents: read and write** and **Pull requests: read and write**.
+   This creates `agent-factory-worker` (role and instance profile) and an egress-only security group of the same name in the default VPC. If `budget_alert_email` is set, it also creates a monthly account budget. The CLI finds these resources by name, so no IDs are copied by hand. Terraform state stays local in `factory/infra/terraform.tfstate`, which is gitignored. Move it to an S3 backend before a second person applies.
+
+2. Store a GitHub token for the worker. Use a fine-grained token limited to the target repo, with **Contents: read and write** and **Pull requests: read and write**. Terraform never sees the token, so it stays out of state.
 
    ```bash
-   read -rs GH_WORKER_TOKEN && aws ssm put-parameter --name /agent-factory/github-token \
+   read -rs GH_WORKER_TOKEN && aws ssm put-parameter --profile agent-factory --name /agent-factory/github-token \
      --type SecureString --value "$GH_WORKER_TOKEN" && unset GH_WORKER_TOKEN
    ```
 
    Agent tasks also read `/agent-factory/anthropic-api-key` or `/agent-factory/openai-api-key` when those parameters exist.
 
-3. Create a Slack Incoming Webhook and export it in the controller's shell. Never commit it.
+3. Create a Slack Incoming Webhook and export it in `~/.zshenv`. Never commit it.
 
    ```bash
    export FACTORY_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
    ```
 
-4. Run with `--worker ec2`. A trivial run takes a few minutes on a `t3.small`. `--instance-type t4g.small` picks the arm64 image.
+4. Run with `--worker ec2`. The region comes from `--region`, `AWS_REGION`, or the profile. A trivial run takes a few minutes on a `t3.small`. `--instance-type t4g.small` picks the arm64 image.
 
-The controller's credentials need `cloudformation:DescribeStacks`, `ec2:RunInstances`, `ec2:CreateTags`, `ec2:DescribeInstances`, `ec2:TerminateInstances`, `iam:PassRole` on the worker role, `ssm:SendCommand`, `ssm:GetCommandInvocation`, and `ssm:DescribeInstanceInformation`.
+The controller's credentials need `ec2:DescribeSecurityGroups`, `ec2:RunInstances`, `ec2:CreateTags`, `ec2:DescribeInstances`, `ec2:TerminateInstances`, `iam:PassRole` on the worker role, `ssm:SendCommand`, `ssm:GetCommandInvocation`, and `ssm:DescribeInstanceInformation`.
 
 ### What protects the account
 
@@ -102,7 +118,7 @@ The controller's credentials need `cloudformation:DescribeStacks`, `ec2:RunInsta
 - User-data schedules `shutdown -h +90` with shutdown behavior `terminate`. If the controller dies, the instance still ends within 90 minutes. Ctrl-C runs cleanup, and `cleanup <run-id>` covers anything left over.
 - To find stray workers: `aws ec2 describe-instances --filters Name=tag-key,Values=agent-factory:run Name=instance-state-name,Values=pending,running`.
 
-Teardown: `aws cloudformation delete-stack --stack-name agent-factory && aws ssm delete-parameter --name /agent-factory/github-token`.
+Teardown: `terraform -chdir=factory/infra destroy`, then `aws ssm delete-parameter --profile agent-factory --name /agent-factory/github-token`.
 
 ## Events
 

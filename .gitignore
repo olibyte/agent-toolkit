@@ -2,3 +2,6 @@
 node_modules/
 .cursor/
 .factory/runs/
+factory/infra/.terraform/
+factory/infra/*.tfstate*
+factory/infra/*.tfvars

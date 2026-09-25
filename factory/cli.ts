@@ -11,7 +11,7 @@ import { runTask } from "./orchestrator.ts";
 import { isTerminal } from "./task-state/machine.ts";
 import { openRunStore, type RunRecord, type RunStore } from "./task-state/store.ts";
 import { parseTask } from "./task.ts";
-import { awsCli, ec2WorkerProvider, loadEc2Config, terminateInstance } from "./worker/ec2.ts";
+import { awsCli, configuredRegion, ec2WorkerProvider, loadEc2Config, terminateInstance } from "./worker/ec2.ts";
 import { localWorkerProvider } from "./worker/local.ts";
 import { describeWorker, type WorkerProvider, type WorkerRef } from "./worker/types.ts";
 
@@ -24,12 +24,14 @@ commands:
 
 options:
   --state-dir DIR        coordination directory (default .factory)
-  --region REGION        AWS region (default $AWS_REGION, then $AWS_DEFAULT_REGION)
-  --stack NAME           CloudFormation stack with worker settings (default agent-factory)
+  --profile PROFILE      AWS CLI profile (default $FACTORY_AWS_PROFILE, then the AWS default chain)
+  --region REGION        AWS region (default $AWS_REGION, $AWS_DEFAULT_REGION, then the profile's region)
+  --name NAME            name prefix used by factory/infra (default agent-factory)
   --instance-type TYPE   EC2 instance type (default t3.small)
 
 environment:
   FACTORY_SLACK_WEBHOOK_URL   Slack Incoming Webhook URL. Unset means console output only.
+  FACTORY_AWS_PROFILE         AWS profile for factory commands only, so other tools keep their own.
 `;
 
 const EXIT = { completed: 0, failed: 1, usage: 2, blocked: 3 } as const;
@@ -51,9 +53,23 @@ export function newRunId(now: Date): string {
   return `${stamp}-${randomBytes(2).toString("hex")}`;
 }
 
-function region(value: string | undefined): string {
-  const resolved = value ?? process.env["AWS_REGION"] ?? process.env["AWS_DEFAULT_REGION"];
-  if (resolved === undefined || resolved === "") throw new UsageError("set --region or AWS_REGION for ec2 workers");
+interface AwsFlags {
+  readonly profile?: string;
+  readonly region?: string;
+}
+
+function awsProfile(flags: AwsFlags): string | null {
+  const profile = flags.profile ?? process.env["FACTORY_AWS_PROFILE"];
+  return profile === undefined || profile === "" ? null : profile;
+}
+
+async function awsRegion(flags: AwsFlags): Promise<string> {
+  const resolved =
+    flags.region ||
+    process.env["AWS_REGION"] ||
+    process.env["AWS_DEFAULT_REGION"] ||
+    (await configuredRegion(undefined, awsProfile(flags)));
+  if (!resolved) throw new UsageError("set --region, AWS_REGION, or a region on the AWS profile");
   return resolved;
 }
 
@@ -79,23 +95,33 @@ function notifierFor(io: Io, eventsFile: string): Notifier {
   );
 }
 
-function terminatorFor(ref: WorkerRef): (ref: WorkerRef) => Promise<void> {
+function terminatorFor(ref: WorkerRef, profile: string | null): (ref: WorkerRef) => Promise<void> {
   return ref.kind === "local"
     ? (target) => localWorkerProvider().terminate(target)
-    : (target) => terminateInstance({ aws: awsCli() }, target);
+    : (target) => terminateInstance({ aws: awsCli(undefined, profile) }, target);
 }
 
-export async function cleanup(store: RunStore, runId: string, reason: string, waitForLaunchMs = 0): Promise<RunRecord> {
+export interface CleanupOptions {
+  readonly waitForLaunchMs?: number;
+  readonly profile?: string | null;
+}
+
+export async function cleanup(
+  store: RunStore,
+  runId: string,
+  reason: string,
+  options: CleanupOptions = {}
+): Promise<RunRecord> {
   let run = await store.get(runId);
   if (run === null) throw new UsageError(`no run ${runId}`);
-  const deadline = Date.now() + waitForLaunchMs;
+  const deadline = Date.now() + (options.waitForLaunchMs ?? 0);
   while (run.worker === null && run.state === "provisioning" && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 250));
     run = (await store.get(runId)) ?? run;
   }
   if (run.worker !== null && run.worker.terminatedAt === null) {
     const { ref } = run.worker;
-    await terminatorFor(ref)(ref);
+    await terminatorFor(ref, options.profile ?? null)(ref);
     run = await store.update(runId, { worker: { ref, terminatedAt: new Date().toISOString() } });
   }
   if (!isTerminal(run.state)) {
@@ -105,7 +131,7 @@ export async function cleanup(store: RunStore, runId: string, reason: string, wa
   return run;
 }
 
-type RunFlags = Readonly<Partial<Record<"worker" | "region" | "stack" | "instance-type", string>>>;
+type RunFlags = AwsFlags & Readonly<Partial<Record<"worker" | "name" | "instance-type", string>>>;
 
 async function runTaskCommand(positionals: readonly string[], values: RunFlags, io: Io, stateDir: string) {
   const [taskPath] = positionals;
@@ -128,10 +154,10 @@ async function runTaskCommand(positionals: readonly string[], values: RunFlags, 
   if (values.worker === "local") {
     worker = localWorkerProvider();
   } else {
-    const aws = awsCli();
+    const aws = awsCli(undefined, awsProfile(values));
     const config = await loadEc2Config(aws, {
-      region: region(values.region),
-      stack: values.stack ?? "agent-factory",
+      region: await awsRegion(values),
+      name: values.name ?? "agent-factory",
       instanceType: values["instance-type"] ?? "t3.small",
     });
     worker = ec2WorkerProvider(config, { aws });
@@ -139,7 +165,7 @@ async function runTaskCommand(positionals: readonly string[], values: RunFlags, 
 
   process.once("SIGINT", () => {
     io.stderr(`[factory] interrupted, cleaning up run ${runId}\n`);
-    cleanup(store, runId, "interrupted by operator", 60_000)
+    cleanup(store, runId, "interrupted by operator", { waitForLaunchMs: 60_000, profile: awsProfile(values) })
       .then((run) => updateHandoff(join(stateDir, "handoff.md"), run))
       .finally(() => process.exit(130));
   });
@@ -185,7 +211,8 @@ export async function main(argv: readonly string[], io: Io = processIo): Promise
         worker: { type: "string" },
         "state-dir": { type: "string" },
         region: { type: "string" },
-        stack: { type: "string" },
+        profile: { type: "string" },
+        name: { type: "string" },
         "instance-type": { type: "string" },
         help: { type: "boolean", short: "h" },
       },
@@ -201,7 +228,9 @@ export async function main(argv: readonly string[], io: Io = processIo): Promise
     if (command === "cleanup") {
       const [runId] = rest;
       if (runId === undefined) throw new UsageError("cleanup needs a run id");
-      const run = await cleanup(openRunStore(join(stateDir, "state.json")), runId, "abandoned: cleaned up by operator");
+      const run = await cleanup(openRunStore(join(stateDir, "state.json")), runId, "abandoned: cleaned up by operator", {
+        profile: awsProfile(values),
+      });
       await updateHandoff(join(stateDir, "handoff.md"), run);
       io.stdout(`${JSON.stringify(run, null, 2)}\n`);
       return EXIT.completed;

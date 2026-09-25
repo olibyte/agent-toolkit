@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { runCommand } from "../exec.ts";
+import { runCommand, type CommandRunner } from "../exec.ts";
 import {
   AwsCliError,
   awsCli,
+  configuredRegion,
   ec2WorkerProvider,
   imageFor,
   loadEc2Config,
@@ -161,35 +162,30 @@ describe("ec2 worker provider", () => {
 });
 
 describe("ec2 config", () => {
-  it("reads worker settings from the CloudFormation stack outputs", async () => {
-    const fake = fakeAws({
-      "cloudformation describe-stacks": [
-        {
-          Stacks: [
-            {
-              Outputs: [
-                { OutputKey: "InstanceProfileName", OutputValue: "profile-x" },
-                { OutputKey: "SecurityGroupId", OutputValue: "sg-9" },
-                { OutputKey: "ParameterPrefix", OutputValue: "/agent-factory" },
-              ],
-            },
-          ],
-        },
-      ],
-    });
-    const loaded = await loadEc2Config(fake.aws, { region: "eu-west-2", stack: "agent-factory", instanceType: "t4g.small" });
-    assert.equal(loaded.instanceProfile, "profile-x");
+  it("finds the Terraform-managed worker resources by name", async () => {
+    const fake = fakeAws({ "ec2 describe-security-groups": [{ SecurityGroups: [{ GroupId: "sg-9" }] }] });
+    const loaded = await loadEc2Config(fake.aws, { region: "eu-west-2", name: "agent-factory", instanceType: "t4g.small" });
+    assert.equal(loaded.instanceProfile, "agent-factory-worker");
     assert.equal(loaded.securityGroupId, "sg-9");
+    assert.equal(loaded.parameterPrefix, "/agent-factory");
     assert.equal(loaded.subnetId, null);
     assert.match(loaded.imageId, /arm64$/);
-    assert.deepEqual(fake.calls[0]?.args, ["cloudformation", "describe-stacks", "--stack-name", "agent-factory"]);
+    assert.deepEqual(fake.calls[0], {
+      args: ["ec2", "describe-security-groups", "--filters", "Name=group-name,Values=agent-factory-worker"],
+      region: "eu-west-2",
+    });
   });
 
-  it("names the missing output", async () => {
-    const fake = fakeAws({ "cloudformation describe-stacks": [{ Stacks: [{ Outputs: [] }] }] });
+  it("points at terraform when the infrastructure is missing, and refuses ambiguity", async () => {
+    const missing = fakeAws({ "ec2 describe-security-groups": [{ SecurityGroups: [] }] });
     await assert.rejects(
-      loadEc2Config(fake.aws, { region: "r", stack: "agent-factory", instanceType: "t3.small" }),
-      /no InstanceProfileName output/
+      loadEc2Config(missing.aws, { region: "r", name: "agent-factory", instanceType: "t3.small" }),
+      /no security group named agent-factory-worker in r\. Run terraform apply in factory\/infra first/
+    );
+    const twice = fakeAws({ "ec2 describe-security-groups": [{ SecurityGroups: [{ GroupId: "a" }, { GroupId: "b" }] }] });
+    await assert.rejects(
+      loadEc2Config(twice.aws, { region: "r", name: "agent-factory", instanceType: "t3.small" }),
+      /2 security groups/
     );
   });
 
@@ -202,6 +198,24 @@ describe("ec2 config", () => {
 });
 
 describe("aws cli runner", () => {
+  it("scopes a factory profile to its own aws calls", async () => {
+    const envs: (NodeJS.ProcessEnv | undefined)[] = [];
+    const runner: CommandRunner = async (argv, options) => {
+      envs.push(options?.env);
+      return { code: 0, stdout: argv.includes("configure") ? "eu-west-2\n" : "{}", stderr: "", timedOut: false };
+    };
+    await awsCli(runner, "agent-factory")(["sts", "get-caller-identity"], "eu-west-2");
+    assert.equal(await configuredRegion(runner, "agent-factory"), "eu-west-2");
+    assert.deepEqual(envs.map((env) => env?.["AWS_PROFILE"]), ["agent-factory", "agent-factory"]);
+    await awsCli(runner)(["sts", "get-caller-identity"], "eu-west-2");
+    assert.equal(envs[2]?.["AWS_PROFILE"], process.env["AWS_PROFILE"]);
+  });
+
+  it("reports no configured region instead of failing", async () => {
+    const unset: CommandRunner = async () => ({ code: 1, stdout: "", stderr: "", timedOut: false });
+    assert.equal(await configuredRegion(unset), null);
+  });
+
   it("adds region and JSON output, and surfaces the AWS error code", async () => {
     const seen: (readonly string[])[] = [];
     const cli = awsCli(async (argv) => {

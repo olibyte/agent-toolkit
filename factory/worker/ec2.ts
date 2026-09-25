@@ -26,21 +26,31 @@ export class AwsCliError extends Error {
   }
 }
 
-export function awsCli(runner: CommandRunner = runCommand): AwsCli {
+function awsEnv(profile: string | null): NodeJS.ProcessEnv {
+  return { ...process.env, AWS_PAGER: "", ...(profile === null ? {} : { AWS_PROFILE: profile }) };
+}
+
+async function runAws(runner: CommandRunner, argv: readonly string[], profile: string | null) {
+  try {
+    return await runner(["aws", ...argv], { env: awsEnv(profile) });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new Error("aws CLI not found on PATH");
+    throw error;
+  }
+}
+
+export function awsCli(runner: CommandRunner = runCommand, profile: string | null = null): AwsCli {
   return async (args, region) => {
-    const label = args.slice(0, 2).join(" ");
-    let result;
-    try {
-      result = await runner(["aws", ...args, "--region", region, "--output", "json"], {
-        env: { ...process.env, AWS_PAGER: "" },
-      });
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new Error("aws CLI not found on PATH");
-      throw error;
-    }
-    if (result.code !== 0) throw new AwsCliError(label, result.stderr);
+    const result = await runAws(runner, [...args, "--region", region, "--output", "json"], profile);
+    if (result.code !== 0) throw new AwsCliError(args.slice(0, 2).join(" "), result.stderr);
     return result.stdout.trim() === "" ? null : JSON.parse(result.stdout);
   };
+}
+
+export async function configuredRegion(runner: CommandRunner = runCommand, profile: string | null = null): Promise<string | null> {
+  const result = await runAws(runner, ["configure", "get", "region"], profile);
+  const region = result.stdout.trim();
+  return result.code === 0 && region !== "" ? region : null;
 }
 
 export interface Ec2WorkerConfig {
@@ -81,31 +91,36 @@ export function imageFor(instanceType: string): string {
   return `resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-${arch}`;
 }
 
+export function infraNames(name: string) {
+  return { worker: `${name}-worker`, parameterPrefix: `/${name}` } as const;
+}
+
 export async function loadEc2Config(
   aws: AwsCli,
-  options: { readonly region: string; readonly stack: string; readonly instanceType: string }
+  options: { readonly region: string; readonly name: string; readonly instanceType: string }
 ): Promise<Ec2WorkerConfig> {
-  const described = await aws(["cloudformation", "describe-stacks", "--stack-name", options.stack], options.region);
-  const outputs = new Map<string, string>();
-  const list = pick(described, ["Stacks", 0, "Outputs"]);
-  for (const output of Array.isArray(list) ? list : []) {
-    const key = pick(output, ["OutputKey"]);
-    const value = pick(output, ["OutputValue"]);
-    if (typeof key === "string" && typeof value === "string") outputs.set(key, value);
+  const names = infraNames(options.name);
+  const described = await aws(
+    ["ec2", "describe-security-groups", "--filters", `Name=group-name,Values=${names.worker}`],
+    options.region
+  );
+  const groups = pick(described, ["SecurityGroups"]);
+  const count = Array.isArray(groups) ? groups.length : 0;
+  if (count !== 1) {
+    throw new Error(
+      count === 0
+        ? `no security group named ${names.worker} in ${options.region}. Run terraform apply in factory/infra first.`
+        : `${count} security groups are named ${names.worker} in ${options.region}; expected one`
+    );
   }
-  const required = (key: string) => {
-    const value = outputs.get(key);
-    if (value === undefined) throw new Error(`stack ${options.stack} has no ${key} output`);
-    return value;
-  };
   return {
     region: options.region,
-    instanceProfile: required("InstanceProfileName"),
-    securityGroupId: required("SecurityGroupId"),
-    subnetId: outputs.get("SubnetId") ?? null,
+    instanceProfile: names.worker,
+    securityGroupId: pickString(described, ["SecurityGroups", 0, "GroupId"], "describe-security-groups"),
+    subnetId: null,
     instanceType: options.instanceType,
     imageId: imageFor(options.instanceType),
-    parameterPrefix: required("ParameterPrefix"),
+    parameterPrefix: names.parameterPrefix,
     maxLifetimeMinutes: 90,
   };
 }
