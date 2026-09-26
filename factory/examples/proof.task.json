@@ -1,0 +1,16 @@
+{
+  "repo": "olibyte/agent-factory-sandbox",
+  "base": "main",
+  "title": "factory: record proof run",
+  "body": "Controlled change from the Factory v0 end-to-end proof. Safe to close without merging.",
+  "change": {
+    "kind": "shell",
+    "run": "mkdir -p proofs && printf 'run %s\\nbranch %s\\nhost %s\\ntime %s\\n' \"$FACTORY_RUN_ID\" \"$FACTORY_BRANCH\" \"$HOSTNAME\" \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" > \"proofs/$FACTORY_RUN_ID.txt\""
+  },
+  "verify": [
+    "test -s \"proofs/$FACTORY_RUN_ID.txt\"",
+    "grep -qx \"run $FACTORY_RUN_ID\" \"proofs/$FACTORY_RUN_ID.txt\"",
+    "git diff --quiet HEAD -- README.md"
+  ],
+  "autoMerge": false
+}

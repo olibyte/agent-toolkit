@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "work": {
+    "goal": "Factory v0 end-to-end proof on an ephemeral EC2 worker",
+    "plan": ".factory/plan.md",
+    "tasks": [
+      {
+        "id": "T1",
+        "status": "done",
+        "dependsOn": []
+      },
+      {
+        "id": "T2",
+        "status": "done",
+        "dependsOn": [
+          "T1"
+        ]
+      },
+      {
+        "id": "T3",
+        "status": "done",
+        "dependsOn": [
+          "T1"
+        ]
+      },
+      {
+        "id": "T4",
+        "status": "done",
+        "dependsOn": [
+          "T1"
+        ]
+      },
+      {
+        "id": "T5",
+        "status": "done",
+        "dependsOn": [
+          "T4"
+        ]
+      },
+      {
+        "id": "T6",
+        "status": "done",
+        "dependsOn": [
+          "T2",
+          "T3",
+          "T5"
+        ]
+      },
+      {
+        "id": "T7",
+        "status": "done",
+        "dependsOn": [
+          "T6"
+        ],
+        "evidence": "run 20260925-070547-e6aa opened olibyte/agent-factory-sandbox#1 from the local worker"
+      },
+      {
+        "id": "T8",
+        "status": "done",
+        "dependsOn": [
+          "T5"
+        ]
+      },
+      {
+        "id": "T9",
+        "status": "done",
+        "dependsOn": [],
+        "note": "Terraform (CloudFormation draft replaced before any deploy)"
+      },
+      {
+        "id": "T12",
+        "status": "done",
+        "dependsOn": [],
+        "evidence": "sts get-caller-identity as olibyte-admin on the agent-factory account; terraform apply added 7 resources in ap-southeast-2"
+      },
+      {
+        "id": "T10",
+        "status": "done",
+        "dependsOn": [
+          "T8",
+          "T9",
+          "T12"
+        ],
+        "evidence": "run 20260926-015512-9c63: EC2 worker terminated, olibyte/agent-factory-sandbox#3 opened, 4 Slack events delivered"
+      },
+      {
+        "id": "T11",
+        "status": "done",
+        "dependsOn": [
+          "T1",
+          "T2",
+          "T3",
+          "T4",
+          "T5",
+          "T6",
+          "T7",
+          "T8",
+          "T9",
+          "T10"
+        ]
+      }
+    ]
+  }
+}

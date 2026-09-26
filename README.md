@@ -42,6 +42,16 @@ Invoke as `$name` or `/name`.
 
 poteto-mode calls swarm, interrogate, and figure-it-out when they are installed, and skips them with a reason when they are absent.
 
+## Factory
+
+[`factory/`](factory/README.md) runs one coding task on a throwaway worker and ends with a pull request. You write a small task file with the repo, the change (a shell command, or a prompt for Claude Code or Codex), and the checks. The factory clones the repo, makes the change, runs the checks, pushes a branch, and opens the PR. It posts each step to Slack, then deletes the worker.
+
+```bash
+node factory/cli.ts run factory/examples/proof.task.json --worker local   # or --worker ec2
+```
+
+The local worker needs Node 22.18 or later and `gh`. The EC2 worker also needs an AWS account and Terraform. [`factory/README.md`](factory/README.md) covers setup. The factory is separate from the skills, and `npx skills add` does not install it.
+
 ## Recommended: quota-axi
 
 [Kun Chen](https://github.com/kunchenguid)'s [quota-axi](https://github.com/kunchenguid/quota-axi) reports local subscription quota windows (Claude, Codex, Cursor, Copilot, and others) so the agent can see remaining runway before it spends more. The report is data only.
