@@ -1,6 +1,9 @@
 # agent-toolkit
 
-Curated Agent Skills for Claude Code, Cursor, Codex CLI, and Antigravity CLI.
+A provider-agnostic agentic engineering stack for any project, in two parts:
+
+- **Skills.** Curated Agent Skills and a shared working style for Claude Code, Cursor, Codex CLI, and Antigravity CLI.
+- **Factory.** A controller that runs one coding task on a throwaway, isolated EC2 worker and ends with a pull request.
 
 ## Install
 
