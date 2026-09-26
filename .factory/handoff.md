@@ -10,6 +10,7 @@ Factory v0: prove one remote task end to end on an ephemeral EC2 worker. The cha
 
 - T1 to T9 are done. The `factory/` package has task-state, notifications (console and Slack webhook), github, worker (local and ec2), the orchestrator, the CLI, and Terraform in `infra/`. `terraform validate` passes with Terraform 1.16.4 and AWS provider 6.x.
 - `cd factory && npm run check` passes: `tsc` strict and 59 `node:test` tests. They cover state transitions, orchestration (happy path, verify failure, launch and ready failures, blocked, escalation, termination failure, auto-merge), a real git push to a bare origin with a fake `gh`, and the EC2 provider against a scripted fake `aws`.
+- T12: the AWS setup is done. Identity Center user `olibyte-admin` has AdministratorAccess on a dedicated `agent-factory` member account, through the SSO profile `agent-factory` (region `ap-southeast-2`). The Terraform in `factory/infra` is applied there: 7 resources, including a $20 monthly budget that alerts `ocben1+agent-factory@gmail.com`. The Terraform state is local to the operator's laptop and gitignored. The controller's name-based lookup finds the security group and instance profile.
 - T7 local proof against real GitHub: runs `20260925-070547-e6aa` and `20260925-070936-ba02` opened olibyte/agent-factory-sandbox#1 and #2. The sandbox is a private, disposable repo created for these proofs.
 - Codex reviewed `factory/` read-only. Two findings were fixed: the GitHub token is now visible only in `prepare` and `publish`, and SIGINT cleanup waits for an in-flight launch. One finding was rejected: the `factory_secret` failure path never echoes the value.
 
@@ -30,8 +31,7 @@ Factory v0: prove one remote task end to end on an ephemeral EC2 worker. The cha
 
 ## Blockers
 
-- T12 (user): the only AWS login is root. Follow `factory/README.md` > "AWS access": enable Identity Center, create the factory member account, and run `aws configure sso --profile agent-factory`. The AWS CLI and Terraform are not installed on this machine yet.
-- T10 also needs a Slack webhook and the worker GitHub token in SSM.
+- T10 needs two secrets from the user: the worker GitHub token in SSM (`/agent-factory/github-token`) and `FACTORY_SLACK_WEBHOOK_URL` in `~/.zshenv`.
 
 ## Open PRs
 
@@ -40,9 +40,8 @@ Factory v0: prove one remote task end to end on an ephemeral EC2 worker. The cha
 
 ## Next recommended action
 
-1. Once T12 is done: `terraform -chdir=factory/infra apply`, then store the worker token (README "Deploy" steps 1 and 2).
-2. With `FACTORY_AWS_PROFILE` and `FACTORY_SLACK_WEBHOOK_URL` set, run `node factory/cli.ts run factory/examples/proof.task.json --worker ec2`.
-3. Confirm that the instance is `terminated`, that the Slack message arrived, and that the run in `.factory/state.json` is `completed`. Then mark T10 done, update this file, and take PR #4 out of draft.
+1. Once both secrets exist, run `node factory/cli.ts run factory/examples/proof.task.json --worker ec2 --profile agent-factory`.
+2. Confirm that the instance is `terminated`, that the Slack message arrived, and that the run in `.factory/state.json` is `completed`. Then mark T10 done, update this file, and take PR #4 out of draft.
 
 <!-- factory:last-run:start -->
 ## Last factory run

@@ -69,9 +69,9 @@
       },
       {
         "id": "T12",
-        "status": "blocked",
+        "status": "done",
         "dependsOn": [],
-        "blockedOn": "user: Identity Center, factory member account, agent-factory SSO profile"
+        "evidence": "sts get-caller-identity as olibyte-admin on the agent-factory account; terraform apply added 7 resources in ap-southeast-2"
       },
       {
         "id": "T10",
@@ -81,7 +81,7 @@
           "T9",
           "T12"
         ],
-        "blockedOn": "T12, Slack webhook, GitHub token in SSM"
+        "blockedOn": "user: GitHub token in SSM /agent-factory/github-token, FACTORY_SLACK_WEBHOOK_URL"
       },
       {
         "id": "T11",
