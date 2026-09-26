@@ -13,3 +13,7 @@ Before you change `factory/`, read `.factory/handoff.md`, then `.factory/plan.md
 ## Skills
 
 `scripts/check-discover.sh` verifies that the published skill listing matches `scripts/expected-skills.txt`.
+
+## Commits and PRs
+
+Do not add AI attribution to commit messages, PR descriptions, or comments. That means no `Co-Authored-By` trailers and no "Generated with" footers.

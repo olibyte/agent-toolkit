@@ -1,7 +1,7 @@
 {
   "version": 1,
   "work": {
-    "goal": "Factory v0 end-to-end proof on an ephemeral EC2 worker",
+    "goal": "Make the factory ready for a real app: task toolchain setup, worker hardening, agent proof on EC2",
     "plan": ".factory/plan.md",
     "tasks": [
       {
@@ -97,6 +97,50 @@
           "T8",
           "T9",
           "T10"
+        ]
+      },
+      {
+        "id": "T13",
+        "title": "Task setup step (toolchain and deps) plus a root volume size option",
+        "status": "todo",
+        "dependsOn": []
+      },
+      {
+        "id": "T14",
+        "title": "Run change and verify as an unprivileged user with IMDS blocked",
+        "status": "todo",
+        "dependsOn": []
+      },
+      {
+        "id": "T15",
+        "title": "Prove an agent task on EC2 against the sandbox",
+        "status": "blocked",
+        "dependsOn": [
+          "T13",
+          "T14"
+        ],
+        "blockedOn": "user: /agent-factory/anthropic-api-key in SSM, Anthropic spend limit"
+      },
+      {
+        "id": "T16",
+        "title": "First real-app task: create the repo, grant the worker token, scaffold through the factory",
+        "status": "todo",
+        "dependsOn": [
+          "T15"
+        ]
+      },
+      {
+        "id": "T17",
+        "title": "Move Terraform state to an S3 backend",
+        "status": "later",
+        "dependsOn": []
+      },
+      {
+        "id": "T18",
+        "title": "Task tracker",
+        "status": "later",
+        "dependsOn": [
+          "T16"
         ]
       }
     ]
