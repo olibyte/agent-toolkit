@@ -12,7 +12,7 @@ controller (your machine, Node 24)                 worker (EC2, bash only)
 │   notifications/ console + Slack      │ ───────▶ │ verify:  task commands   │
 │   worker/  local | ec2 provider       │  (no SSH)│ publish: commit, push,   │
 │   github/  publish script + PR parse  │ ◀─────── │          gh pr create    │
-│ .factory/state.json, handoff.md       │  stdout  └──────────────────────────┘
+│ .factory/runs/ (gitignored)           │  stdout  └──────────────────────────┘
 └───────────────────────────────────────┘
 ```
 
@@ -21,7 +21,7 @@ controller (your machine, Node 24)                 worker (EC2, bash only)
 - **Secrets.** The worker's GitHub token (and agent API keys) are SecureString parameters under `/agent-factory/`. The worker reads them with its instance role. An explicit Deny blocks every other parameter. The Slack webhook stays on the controller in `FACTORY_SLACK_WEBHOOK_URL`. Secrets never appear in user-data, SSM command parameters, state, or logs.
 - **Ephemeral worker.** The worker is Amazon Linux 2023, which ships with the SSM agent and the AWS CLI. It has IMDSv2, no key pair, and a security group with no inbound rules. It uses the default VPC's public subnet for egress. User-data only sets `shutdown -h +90` with shutdown behavior `terminate`, so a crashed controller still cannot leak an instance for long. The orchestrator terminates the worker in a `finally` block and waits for `terminated`.
 - **Infra.** Terraform in `factory/infra/` creates the role, the instance profile, and the security group, plus an optional budget. The resources have fixed names (`<name>-worker`, `/<name>/`) and the controller finds them by name, so it never reads Terraform state. `terraform destroy` removes everything. The factory runs in a dedicated AWS account, reached through IAM Identity Center with short-lived credentials.
-- **State.** `.factory/state.json` (committed) keeps one record per run: task, state, transition history, worker ref, PR metadata, and error. Per-run phase logs and the event JSONL go to `.factory/runs/<id>/`, which is gitignored. `.factory/handoff.md` has hand-written sections plus a generated "Last factory run" block.
+- **State.** Committed coordination lives in `.factory/`: the plan, the handoff, and `state.json` with the task list. Run records are the operator's data, so the CLI writes only to the gitignored `.factory/runs/`. That covers `state.json` (one record per run: task, transition history, worker ref, PR metadata, error), `last-run.md`, and per-run logs and events.
 - **Recovery.** A run records its worker ref as soon as the instance launches. `factory cleanup <run>` terminates a leftover worker and fails the run.
 - **Models.** An `agent` change defaults to a cost-efficient model alias. When `escalationModel` is set, a failed verification gets exactly one retry on the stronger model.
 

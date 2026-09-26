@@ -4,10 +4,10 @@ This repository publishes Agent Skills (`skills/`, `optional/`) and hosts Factor
 
 ## Factory
 
-Before you change `factory/`, read `.factory/handoff.md`, then `.factory/plan.md` and `.factory/state.json`. Chat history is not needed.
+Before you change `factory/`, read `.factory/handoff.md`, then `.factory/plan.md` and `.factory/state.json`. Chat history is not needed. For the latest factory run on this machine, read `.factory/runs/last-run.md`.
 
 - Checks: `cd factory && npm install && npm run check`, and `terraform -chdir=factory/infra validate` after changing `factory/infra/`.
-- At each milestone, update the hand-written sections of `.factory/handoff.md` and `work.tasks` in `.factory/state.json`. `factory/cli.ts` owns `runs` and the "Last factory run" block.
+- At each milestone, update `.factory/handoff.md` and `work.tasks` in `.factory/state.json`. `factory/cli.ts` writes only to `.factory/runs/`, which is gitignored and never committed.
 - Never write secrets into `.factory/`, task files, or logs.
 
 ## Skills

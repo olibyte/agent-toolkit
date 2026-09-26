@@ -6,7 +6,7 @@ The controller is TypeScript on Node 24 with no runtime dependencies. The worker
 
 | Directory | Contents |
 | --- | --- |
-| `task-state/` | Run state machine and the `.factory/state.json` store |
+| `task-state/` | Run state machine and the run store |
 | `notifications/` | Event types, notifier interface, Slack Incoming Webhook adapter |
 | `github/` | Checkout and publish scripts (branch, commit, push, PR, auto-merge) and PR metadata parsing |
 | `worker/` | Provider interface, phase scripts, `local` and `ec2` providers |
@@ -54,11 +54,13 @@ node factory/cli.ts status [run-id]
 node factory/cli.ts cleanup <run-id>      # terminate a leftover worker, fail an unfinished run
 ```
 
-Exit codes: `0` completed, `1` failed, `2` usage error, `3` blocked. The final run record goes to stdout, and progress goes to stderr. Each run writes:
+Exit codes: `0` completed, `1` failed, `2` usage error, `3` blocked. The final run record goes to stdout, and progress goes to stderr.
 
-- `.factory/state.json` (committed): task, state history, worker, PR metadata, and error.
-- `.factory/runs/<id>/` (gitignored): phase logs and `events.jsonl`.
-- The "Last factory run" block in `.factory/handoff.md`.
+Everything a run writes stays under `.factory/runs/`, which is gitignored. Run history belongs to whoever ran it, not to the repo.
+
+- `.factory/runs/state.json`: every run's task, state history, worker, PR metadata, and error.
+- `.factory/runs/last-run.md`: a readable summary of the latest run, for the next agent or person.
+- `.factory/runs/<id>/`: phase logs and `events.jsonl`.
 
 The local worker runs agent tasks with permission prompts disabled, on your machine. Use it for shell tasks, or for agents you already trust there.
 

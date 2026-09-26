@@ -6,14 +6,13 @@ import { describe, it } from "node:test";
 import { cleanup, newRunId } from "./cli.ts";
 import { runCommand } from "./exec.ts";
 import { gitFixture } from "./fixtures.test-helper.ts";
-import { BLOCK_END, BLOCK_START, replaceBlock } from "./handoff.ts";
 import { openRunStore } from "./task-state/store.ts";
 import { parseTask } from "./task.ts";
 
 const CLI = join(import.meta.dirname, "cli.ts");
 
 describe("factory cli", () => {
-  it("runs a task on the local worker and records state, events, logs, and handoff", async () => {
+  it("runs a task on the local worker and records state, events, logs, and a summary", async () => {
     const fixture = await gitFixture();
     const stateDir = join(fixture.root, ".factory");
     const taskFile = join(fixture.root, "task.json");
@@ -37,11 +36,12 @@ describe("factory cli", () => {
     assert.match(run.stderr, /\[factory\] pr\.opened: PR <https:\/\/github.com\/owner\/sandbox\/pull\/1/);
     assert.match(run.stderr, /state pr_opened -> completed/);
 
-    const state = JSON.parse(await readFile(join(stateDir, "state.json"), "utf8"));
+    const state = JSON.parse(await readFile(join(stateDir, "runs", "state.json"), "utf8"));
     assert.equal(state.runs[0].id, record.id);
-    const handoff = await readFile(join(stateDir, "handoff.md"), "utf8");
-    assert.match(handoff, new RegExp(`Run: \`${record.id}\` is \\*\\*completed\\*\\*`));
-    assert.match(handoff, /PR: \[#1\]\(https:\/\/github.com\/owner\/sandbox\/pull\/1\), open/);
+    assert.deepEqual((await readdir(stateDir)).sort(), ["runs"]);
+    const summary = await readFile(join(stateDir, "runs", "last-run.md"), "utf8");
+    assert.match(summary, new RegExp(`Run: \`${record.id}\` is \\*\\*completed\\*\\*`));
+    assert.match(summary, /PR: \[#1\]\(https:\/\/github.com\/owner\/sandbox\/pull\/1\), open/);
 
     const runDir = join(stateDir, "runs", record.id);
     assert.deepEqual((await readdir(runDir)).sort(), [
@@ -92,17 +92,8 @@ describe("cleanup", () => {
   });
 });
 
-describe("run ids and handoff blocks", () => {
+describe("run ids", () => {
   it("makes sortable run ids", () => {
     assert.match(newRunId(new Date("2026-09-25T16:45:01Z")), /^20260925-164501-[0-9a-f]{4}$/);
-  });
-
-  it("replaces only the generated block", () => {
-    const document = `# Handoff\n\nhand-written\n\n${BLOCK_START}\nold\n${BLOCK_END}\n\n## After\n`;
-    assert.equal(
-      replaceBlock(document, "new"),
-      `# Handoff\n\nhand-written\n\n${BLOCK_START}\nnew\n${BLOCK_END}\n\n## After\n`
-    );
-    assert.equal(replaceBlock("# Handoff\n", "new"), `# Handoff\n\n${BLOCK_START}\nnew\n${BLOCK_END}\n`);
   });
 });

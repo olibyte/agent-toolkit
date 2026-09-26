@@ -4,10 +4,10 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { updateHandoff } from "./handoff.ts";
 import { fanout, jsonLinesNotifier, type Notifier } from "./notifications/notifier.ts";
 import { formatSlackMessage, slackWebhookNotifier } from "./notifications/slack.ts";
 import { runTask } from "./orchestrator.ts";
+import { writeRunSummary } from "./run-summary.ts";
 import { isTerminal } from "./task-state/machine.ts";
 import { openRunStore, type RunRecord, type RunStore } from "./task-state/store.ts";
 import { parseTask } from "./task.ts";
@@ -23,7 +23,7 @@ commands:
   cleanup <run-id>                     terminate a leftover worker and fail an unfinished run
 
 options:
-  --state-dir DIR        coordination directory (default .factory)
+  --state-dir DIR        run records go to DIR/runs/ (default .factory)
   --profile PROFILE      AWS CLI profile (default $FACTORY_AWS_PROFILE, then the AWS default chain)
   --region REGION        AWS region (default $AWS_REGION, $AWS_DEFAULT_REGION, then the profile's region)
   --name NAME            name prefix used by factory/infra (default agent-factory)
@@ -47,6 +47,11 @@ const processIo: Io = {
 };
 
 class UsageError extends Error {}
+
+function runPaths(stateDir: string) {
+  const runs = join(stateDir, "runs");
+  return { runs, state: join(runs, "state.json"), summary: join(runs, "last-run.md") };
+}
 
 export function newRunId(now: Date): string {
   const stamp = now.toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15);
@@ -139,11 +144,12 @@ async function runTaskCommand(positionals: readonly string[], values: RunFlags, 
   if (values.worker !== "local" && values.worker !== "ec2") throw new UsageError("run needs --worker local or --worker ec2");
   const task = parseTask(JSON.parse(await readFile(taskPath, "utf8")));
   const runId = newRunId(new Date());
-  const runDir = join(stateDir, "runs", runId);
+  const paths = runPaths(stateDir);
+  const runDir = join(paths.runs, runId);
   mkdirSync(runDir, { recursive: true });
   const eventsFile = join(runDir, "events.jsonl");
 
-  const store = openRunStore(join(stateDir, "state.json"), {
+  const store = openRunStore(paths.state, {
     onChange: (change) => {
       appendFileSync(eventsFile, `${JSON.stringify({ type: "state.changed", ...change })}\n`);
       io.stderr(`[factory] state ${change.from ?? "new"} -> ${change.to}${change.reason ? ` (${change.reason})` : ""}\n`);
@@ -166,7 +172,7 @@ async function runTaskCommand(positionals: readonly string[], values: RunFlags, 
   process.once("SIGINT", () => {
     io.stderr(`[factory] interrupted, cleaning up run ${runId}\n`);
     cleanup(store, runId, "interrupted by operator", { waitForLaunchMs: 60_000, profile: awsProfile(values) })
-      .then((run) => updateHandoff(join(stateDir, "handoff.md"), run))
+      .then((run) => writeRunSummary(paths.summary, run))
       .finally(() => process.exit(130));
   });
 
@@ -176,18 +182,18 @@ async function runTaskCommand(positionals: readonly string[], values: RunFlags, 
       store,
       worker,
       notifier: notifierFor(io, eventsFile),
-      saveLog: (id, name, output) => writeFile(join(stateDir, "runs", id, `${name}.log`), output),
+      saveLog: (id, name, output) => writeFile(join(paths.runs, id, `${name}.log`), output),
     },
     task,
     runId
   );
-  await updateHandoff(join(stateDir, "handoff.md"), run);
+  await writeRunSummary(paths.summary, run);
   io.stdout(`${JSON.stringify(run, null, 2)}\n`);
   return run.state === "completed" ? EXIT.completed : run.state === "blocked" ? EXIT.blocked : EXIT.failed;
 }
 
 async function statusCommand(positionals: readonly string[], io: Io, stateDir: string) {
-  const store = openRunStore(join(stateDir, "state.json"));
+  const store = openRunStore(runPaths(stateDir).state);
   const [runId] = positionals;
   if (runId !== undefined) {
     const run = await store.get(runId);
@@ -228,10 +234,11 @@ export async function main(argv: readonly string[], io: Io = processIo): Promise
     if (command === "cleanup") {
       const [runId] = rest;
       if (runId === undefined) throw new UsageError("cleanup needs a run id");
-      const run = await cleanup(openRunStore(join(stateDir, "state.json")), runId, "abandoned: cleaned up by operator", {
+      const paths = runPaths(stateDir);
+      const run = await cleanup(openRunStore(paths.state), runId, "abandoned: cleaned up by operator", {
         profile: awsProfile(values),
       });
-      await updateHandoff(join(stateDir, "handoff.md"), run);
+      await writeRunSummary(paths.summary, run);
       io.stdout(`${JSON.stringify(run, null, 2)}\n`);
       return EXIT.completed;
     }
