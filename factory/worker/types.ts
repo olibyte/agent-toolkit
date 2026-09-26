@@ -19,9 +19,11 @@ export interface PhaseResult {
 
 export interface WorkerEnvironment {
   readonly workdir: string;
+  // Defines factory_secret NAME, factory_task SCRIPT [VAR...] (run as the task user), and factory_task_owns PATH.
   readonly preamble: string;
   readonly githubAuth: string;
   readonly setup: string;
+  installPackages(packages: readonly string[]): string;
   agentSetup(harness: AgentHarness): string;
 }
 

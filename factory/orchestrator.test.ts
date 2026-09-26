@@ -49,7 +49,7 @@ function fakeWorker(options: FakeWorkerOptions = {}) {
       calls.push("ready");
       if (options.readyFails) throw new Error("timed out waiting for SSM registration of i-abc");
     },
-    environment: () => ({ workdir: "/opt/agent-factory", preamble: "", githubAuth: "", setup: "", agentSetup: () => "" }),
+    environment: () => ({ workdir: "/opt/agent-factory", preamble: "", githubAuth: "", setup: "", installPackages: () => "", agentSetup: () => "" }),
     async exec(_ref, phase, script) {
       calls.push(phase);
       (scripts[phase] ??= []).push(script);
@@ -181,8 +181,8 @@ describe("orchestrator", () => {
       "completed",
     ]);
     assert.match(run.history[4]?.reason ?? "", /verify exited 1: PROOF.md is empty; retrying with opus/);
-    assert.match(worker.scripts.change?.[0] ?? "", /--model 'sonnet'/);
-    assert.match(worker.scripts.change?.[1] ?? "", /--model 'opus'/);
+    assert.match(worker.scripts.change?.[0] ?? "", /--model \S*sonnet/);
+    assert.match(worker.scripts.change?.[1] ?? "", /--model \S*opus/);
     assert.match(worker.scripts.change?.[1] ?? "", /failed verification with this output:\nPROOF.md is empty/);
     assert.deepEqual(logs, ["prepare", "change-1", "verify-1", "change-2", "verify-2", "publish"]);
   });

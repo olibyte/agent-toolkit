@@ -29,8 +29,11 @@ type AgentChange = Extract<Change, { kind: "agent" }>;
 
 export function phasePaths(workdir: string) {
   return {
-    repoDir: `${workdir}/repo`,
-    signalFile: `${workdir}/signal.json`,
+    cloneDir: `${workdir}/clone`,
+    taskDir: `${workdir}/task`,
+    repoDir: `${workdir}/task/repo`,
+    signalFile: `${workdir}/task/signal.json`,
+    patchFile: `${workdir}/changes.patch`,
     bodyFile: `${workdir}/pr-body.md`,
     logFile: (phase: Phase) => `${workdir}/logs/${phase}.log`,
     resultFile: (phase: Phase) => `${workdir}/${phase}.result.json`,
@@ -50,82 +53,111 @@ export function agentPrompt(context: PhaseContext, change: AgentChange, feedback
   return lines.join("\n");
 }
 
-function agentCommand(change: AgentChange, prompt: string, model: string | null): string {
+function asTask(context: PhaseContext, lines: readonly string[], env: readonly string[] = []): string {
+  const { repoDir, signalFile } = phasePaths(context.environment.workdir);
+  const script = [
+    "set -euo pipefail",
+    `export FACTORY_RUN_ID=${shq(context.runId)} FACTORY_BRANCH=${shq(context.branch)} FACTORY_SIGNAL_FILE=${shq(signalFile)}`,
+    `cd ${shq(repoDir)}`,
+    ...lines,
+  ].join("\n");
+  return ["factory_task", shq(script), ...env].join(" ");
+}
+
+function echoed(commands: readonly string[]): string[] {
+  return commands.flatMap((command) => [`printf '$ %s\\n' ${shq(command)}`, `bash -c ${shq(command)}`]);
+}
+
+function agentChange(context: PhaseContext, change: AgentChange, attempt: ChangeAttempt): string[] {
+  const prompt = agentPrompt(context, change, attempt.feedback);
+  const model = attempt.model === null ? "" : ` --model ${shq(attempt.model)}`;
+  const run = ['rm -f "$FACTORY_SIGNAL_FILE"'];
   switch (change.harness) {
     case "claude-code":
       return [
         'if key="$(factory_secret anthropic-api-key)" && [ -n "$key" ]; then export ANTHROPIC_API_KEY="$key"; fi',
-        `IS_SANDBOX=1 claude -p ${shq(prompt)}${model === null ? "" : ` --model ${shq(model)}`} --dangerously-skip-permissions`,
-      ].join("\n");
+        asTask(context, [...run, `IS_SANDBOX=1 claude -p ${shq(prompt)}${model} --dangerously-skip-permissions`], [
+          "ANTHROPIC_API_KEY",
+        ]),
+      ];
     case "codex":
       return [
-        'if key="$(factory_secret openai-api-key)" && [ -n "$key" ]; then printf \'%s\' "$key" | codex login --with-api-key; fi',
-        `codex exec --dangerously-bypass-approvals-and-sandbox${model === null ? "" : ` --model ${shq(model)}`} ${shq(prompt)}`,
-      ].join("\n");
+        `if key="$(factory_secret openai-api-key)" && [ -n "$key" ]; then printf '%s' "$key" | ${asTask(context, ["codex login --with-api-key"])}; fi`,
+        asTask(context, [...run, `codex exec --dangerously-bypass-approvals-and-sandbox${model} ${shq(prompt)}`]),
+      ];
   }
 }
 
-function changeBody(context: PhaseContext, attempt: ChangeAttempt): string {
-  const paths = phasePaths(context.environment.workdir);
+function changeBody(context: PhaseContext, attempt: ChangeAttempt): string[] {
   const change = context.task.change;
-  const run =
-    change.kind === "shell"
-      ? `bash -c ${shq(change.run)}`
-      : [
-          context.environment.agentSetup(change.harness),
-          agentCommand(change, agentPrompt(context, change, attempt.feedback), attempt.model),
-        ].join("\n");
+  const result = shq(phasePaths(context.environment.workdir).resultFile("change"));
   return [
     WITHOUT_GITHUB_TOKEN,
-    `export FACTORY_SIGNAL_FILE=${shq(paths.signalFile)}`,
-    'rm -f "$FACTORY_SIGNAL_FILE"',
-    `cd ${shq(paths.repoDir)}`,
-    run,
-    `if [ -s "$FACTORY_SIGNAL_FILE" ]; then cp "$FACTORY_SIGNAL_FILE" ${shq(paths.resultFile("change"))}; exit 0; fi`,
-    'if [ -z "$(git status --porcelain)" ]; then echo "change produced no diff" >&2; exit 1; fi',
-    "git status --short",
-  ].join("\n");
+    ...(change.kind === "shell"
+      ? [asTask(context, ['rm -f "$FACTORY_SIGNAL_FILE"', `bash -c ${shq(change.run)}`])]
+      : agentChange(context, change, attempt)),
+    `${asTask(context, ['if [ -s "$FACTORY_SIGNAL_FILE" ]; then cat "$FACTORY_SIGNAL_FILE"; fi'])} > ${result}`,
+    `if [ -s ${result} ]; then exit 0; fi`,
+    asTask(context, [
+      'if [ -z "$(git status --porcelain)" ]; then echo "change produced no diff" >&2; exit 1; fi',
+      "git status --short",
+    ]),
+  ];
 }
 
-function verifyBody(context: PhaseContext): string {
-  const { repoDir } = phasePaths(context.environment.workdir);
+function prepareBody(context: PhaseContext): string[] {
+  const { environment, task, branch } = context;
+  const paths = phasePaths(environment.workdir);
+  return [
+    environment.setup,
+    ...(task.packages.length === 0 ? [] : [environment.installPackages(task.packages)]),
+    environment.githubAuth,
+    checkoutScript({ repo: task.repo, base: task.base, branch, repoDir: paths.cloneDir }),
+    WITHOUT_GITHUB_TOKEN,
+    `rm -rf ${shq(paths.taskDir)}`,
+    `mkdir -p ${shq(paths.taskDir)}`,
+    `cp -a ${shq(paths.cloneDir)} ${shq(paths.repoDir)}`,
+    `factory_task_owns ${shq(paths.taskDir)}`,
+    ...(task.change.kind === "agent" ? [environment.agentSetup(task.change.harness)] : []),
+    ...(task.setup.length === 0 ? [] : [asTask(context, echoed(task.setup))]),
+  ];
+}
+
+function publishBody(context: PhaseContext): string[] {
+  const { environment, task, branch, runId } = context;
+  const paths = phasePaths(environment.workdir);
+  const patch = shq(paths.patchFile);
   return [
     WITHOUT_GITHUB_TOKEN,
-    `cd ${shq(repoDir)}`,
-    ...context.task.verify.flatMap((command) => [`printf '$ %s\\n' ${shq(command)}`, `bash -c ${shq(command)}`]),
-  ].join("\n");
+    `export FACTORY_BASE_COMMIT="$(git -C ${shq(paths.cloneDir)} rev-parse HEAD)"`,
+    `${asTask(context, ["git add --all", 'git diff --cached --binary "$FACTORY_BASE_COMMIT"'], ["FACTORY_BASE_COMMIT"])} > ${patch}`,
+    `if [ -s ${patch} ]; then git -C ${shq(paths.cloneDir)} apply --index ${patch}; fi`,
+    environment.githubAuth,
+    publishScript({
+      repo: task.repo,
+      base: task.base,
+      branch,
+      repoDir: paths.cloneDir,
+      title: task.title,
+      commitTrailer: `Factory-Run: ${runId}`,
+      body: `${task.body}\n\n---\nOpened by agent-factory run \`${runId}\`.`,
+      bodyFile: paths.bodyFile,
+      resultFile: paths.resultFile("publish"),
+      autoMerge: task.autoMerge,
+    }),
+  ];
 }
 
-function body(phase: Phase, context: PhaseContext, attempt: ChangeAttempt): string {
-  const paths = phasePaths(context.environment.workdir);
-  const { task, branch, runId } = context;
+function body(phase: Phase, context: PhaseContext, attempt: ChangeAttempt): string[] {
   switch (phase) {
     case "prepare":
-      return [
-        context.environment.setup,
-        context.environment.githubAuth,
-        checkoutScript({ repo: task.repo, base: task.base, branch, repoDir: paths.repoDir }),
-      ].join("\n");
+      return prepareBody(context);
     case "change":
       return changeBody(context, attempt);
     case "verify":
-      return verifyBody(context);
+      return [WITHOUT_GITHUB_TOKEN, asTask(context, echoed(context.task.verify))];
     case "publish":
-      return [
-        context.environment.githubAuth,
-        publishScript({
-          repo: task.repo,
-          base: task.base,
-          branch,
-          repoDir: paths.repoDir,
-          title: task.title,
-          commitTrailer: `Factory-Run: ${runId}`,
-          body: `${task.body}\n\n---\nOpened by agent-factory run \`${runId}\`.`,
-          bodyFile: paths.bodyFile,
-          resultFile: paths.resultFile("publish"),
-          autoMerge: task.autoMerge,
-        }),
-      ].join("\n");
+      return publishBody(context);
   }
 }
 
@@ -146,9 +178,8 @@ export function renderPhase(
     "(",
     "set -euo pipefail",
     `echo "factory ${context.runId} phase ${phase} on \${HOSTNAME:-unknown} at $(date -u +%Y-%m-%dT%H:%M:%SZ)"`,
-    `export FACTORY_RUN_ID=${shq(context.runId)} FACTORY_BRANCH=${shq(context.branch)}`,
     context.environment.preamble,
-    body(phase, context, attempt),
+    ...body(phase, context, attempt),
     `) > ${log} 2>&1 < /dev/null`,
     "status=$?",
     `tail -c ${OUTPUT_TAIL_BYTES} ${log}`,

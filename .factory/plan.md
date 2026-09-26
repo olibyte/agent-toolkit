@@ -39,6 +39,15 @@ every non-terminal state ─▶ failed
 
 The runtime is Node 24's built-in TypeScript type stripping with `node:test`, and there are no runtime dependencies. The only dev dependencies are `typescript` and `@types/node`, used for `tsc --noEmit`. The existing `skills/poteto-mode/scripts` tools use Bun, but Bun is not installed on this machine, and the worker needs no TypeScript runtime at all. The code keeps the existing style: strict TS, readonly interfaces, discriminated unions, and injected fakes in tests.
 
+### Task setup and worker hardening (T13, T14)
+
+- **Toolchain.** A task can declare `packages` and `setup`. `packages` are Amazon Linux package names that root installs with `dnf` in `prepare`. The names are validated, so they cannot inject shell. `setup` holds commands that run as the task user in the repo at the end of `prepare`, for example a Node tarball into `~/.local` or `npm ci`. `~/.local/bin` is on the task user's `PATH` in every phase. `--volume-gb` (default 20) sets an encrypted gp3 root volume that is deleted on termination, because the image's 8 GB is too small for real builds.
+- **Task user.** Root runs only controller-rendered steps: base tools, packages, the agent CLI, the clone, and publishing. Everything the task defines runs as the unprivileged `factory-task`: `setup`, `change`, `verify`, and the diff that `publish` reads. It runs through `setpriv` with a clean environment of `HOME`, `PATH`, and `LANG`, plus the agent key during `change` only.
+- **IMDS.** An nftables rule rejects `169.254.169.254` and `fd00:ec2::254` for the task uid, so task code cannot get instance role credentials. `prepare` fails if the task user can still reach IMDS.
+- **Crossing the boundary.** Root clones into `clone/`, copies it to `task/repo`, and hands `task/` to the task user before any task code runs. Data flows back only as stdout of a process that runs as the task user: the blocked signal and a binary patch against the base commit. Root never runs git in the task's repo. Instead, `publish` applies the patch to its own clone and pushes from there. This keeps a planted hook or `.git/config` entry (such as `core.fsmonitor`) from running as root next to the GitHub token.
+- **Script transport.** SSM writes each phase script to a `mktemp` file owned by root. It no longer uses a fixed `/tmp` path that the task user could create first.
+- **Local worker.** It renders the same scripts. There, `factory_task` is plain `bash` as the operator, so the local worker gives no isolation.
+
 ## Reuse
 
 - **`gh` and `aws` CLIs** instead of SDKs. This matches `watch-pr/github.ts`, which already shells out to `gh`.
@@ -63,6 +72,8 @@ The runtime is Node 24's built-in TypeScript type stripping with `node:test`, an
 | T12 | AWS account: Identity Center, factory member account, `agent-factory` profile (user) | – |
 | T10 | EC2 end-to-end proof | T8, T9, T12, Slack webhook, token in SSM |
 | T11 | Codex review, docs, handoff | all |
+| T13 | Task `packages` and `setup`, `--volume-gb` | – |
+| T14 | Task user, IMDS block, patch-based publish, root-only script files | – |
 
 ## Out of scope
 
