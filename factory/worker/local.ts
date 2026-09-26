@@ -39,9 +39,13 @@ export function localWorkerProvider(options: LocalWorkerOptions = {}): WorkerPro
         preamble: [
           `export GIT_CONFIG_GLOBAL=${shq(`${dir}/gitconfig`)}`,
           "factory_secret() { return 1; }",
+          'factory_task() { bash -c "$1"; }',
+          "factory_task_owns() { :; }",
         ].join("\n"),
         githubAuth: 'GH_TOKEN="${GH_TOKEN:-$(gh auth token)}"\nexport GH_TOKEN',
         setup: [requireTool("git"), requireTool("gh")].join("\n"),
+        installPackages: (packages) =>
+          `echo ${shq(`local worker skips packages, so install them on this machine if the task needs them: ${packages.join(" ")}`)}`,
         agentSetup: (harness) => requireTool(AGENT_BINARY[harness]),
       };
     },

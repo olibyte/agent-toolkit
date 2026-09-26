@@ -39,10 +39,11 @@ describe("phase scripts", () => {
       preamble: "factory_secret() { return 1; }",
       githubAuth: "export GH_TOKEN=from-auth",
       setup: "true",
+      installPackages: () => "true",
       agentSetup: () => "true",
     };
     const tasks = [
-      shellTask({ body: "it's $(dangerous) `too`" }),
+      shellTask({ body: "it's $(dangerous) `too`", packages: ["python3.12"], setup: ["npm ci --ignore-scripts=false"] }),
       shellTask({
         change: { kind: "agent", harness: "claude-code", prompt: "Fix the 'bug' in $HOME" },
         autoMerge: true,
@@ -121,6 +122,89 @@ describe("local worker", () => {
       const result = await exec(phase);
       assert.equal(result.exitCode, 0, `${phase}:\n${result.output}`);
     }
+  });
+
+  it("runs setup commands in the repo before the change, without the GitHub token", async () => {
+    const fixture = await gitFixture();
+    const { exec } = await localRun(
+      fixture,
+      shellTask({
+        packages: ["gcc"],
+        setup: ["mkdir -p .tools && echo \"node for $FACTORY_RUN_ID\" > .tools/runtime", 'test -z "${GH_TOKEN:-}"'],
+        change: { kind: "shell", run: "cp .tools/runtime PROOF.md && rm -r .tools" },
+        verify: ["grep -qx 'node for run-1' PROOF.md"],
+      })
+    );
+    const prepared = await exec("prepare");
+    assert.equal(prepared.exitCode, 0, prepared.output);
+    assert.match(prepared.output, /local worker skips packages.*: gcc/);
+    assert.match(prepared.output, /\$ mkdir -p \.tools/);
+    for (const phase of ["change", "verify", "publish"] as const) {
+      const result = await exec(phase);
+      assert.equal(result.exitCode, 0, `${phase}:\n${result.output}`);
+    }
+    assert.equal(await fixture.git("--git-dir", fixture.origin, "show", "factory/run-1:PROOF.md"), "node for run-1");
+  });
+
+  it("publishes from its own clone, so hooks planted in the task repo never run", async () => {
+    const fixture = await gitFixture();
+    const marker = join(fixture.root, "hook-ran");
+    const { exec } = await localRun(
+      fixture,
+      shellTask({
+        change: {
+          kind: "shell",
+          run: [
+            "echo committed > COMMITTED.md && git add COMMITTED.md && git -c user.name=t -c user.email=t@example.com commit -qm agent",
+            `printf '#!/bin/sh\\ntouch ${marker}\\n' > .git/hooks/pre-commit`,
+            "cp .git/hooks/pre-commit .git/hooks/pre-push && chmod +x .git/hooks/pre-commit .git/hooks/pre-push",
+            "printf 'bin\\0' > tool.bin && chmod +x tool.bin",
+            "echo staged > PROOF.md",
+          ].join(" && "),
+        },
+        verify: ["test -f COMMITTED.md"],
+      })
+    );
+    for (const phase of PHASES) {
+      const result = await exec(phase);
+      assert.equal(result.exitCode, 0, `${phase}:\n${result.output}`);
+    }
+    assert.equal(existsSync(marker), false, "a hook from the task repo ran during publish");
+    const tree = await fixture.git("--git-dir", fixture.origin, "ls-tree", "-r", "factory/run-1");
+    assert.match(tree, /^100644 blob \S+\tCOMMITTED\.md$/m);
+    assert.match(tree, /^100644 blob \S+\tPROOF\.md$/m);
+    assert.match(tree, /^100755 blob \S+\ttool\.bin$/m);
+    assert.equal(await fixture.git("--git-dir", fixture.origin, "rev-list", "--count", "main..factory/run-1"), "1");
+  });
+
+  it("refuses a forged patch that writes into the publish clone's .git", async () => {
+    const fixture = await gitFixture();
+    const forged = [
+      "diff --git a/.git/hooks/pre-commit b/.git/hooks/pre-commit",
+      "new file mode 100755",
+      "--- /dev/null",
+      "+++ b/.git/hooks/pre-commit",
+      "@@ -0,0 +1 @@",
+      `+touch ${join(fixture.root, "hook-ran")}`,
+    ].join("\\n");
+    const { exec } = await localRun(
+      fixture,
+      shellTask({
+        change: {
+          kind: "shell",
+          run: `printf '#!/bin/sh\\nprintf "${forged}\\\\n"\\n' > .git/forge && chmod +x .git/forge && git config diff.external "$PWD/.git/forge" && echo x > PROOF.md`,
+        },
+        verify: ["true"],
+      })
+    );
+    for (const phase of ["prepare", "change", "verify"] as const) {
+      const result = await exec(phase);
+      assert.equal(result.exitCode, 0, `${phase}:\n${result.output}`);
+    }
+    const published = await exec("publish");
+    assert.notEqual(published.exitCode, 0, published.output);
+    assert.match(published.output, /invalid path '\.git\/hooks\/pre-commit'/);
+    assert.equal((await fixture.gh()).prs.length, 0);
   });
 
   it("fails a change that produces no diff", async () => {

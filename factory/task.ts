@@ -21,6 +21,8 @@ export interface TaskSpec {
   readonly base: string;
   readonly title: string;
   readonly body: string;
+  readonly packages: readonly string[];
+  readonly setup: readonly string[];
   readonly change: Change;
   readonly verify: readonly string[];
   readonly autoMerge: boolean;
@@ -33,6 +35,7 @@ export class TaskSpecError extends Error {
 
 const REPO = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const REF = /^(?!-)(?!.*\.\.)(?!.*\/\/)[A-Za-z0-9._/-]+$/;
+const PACKAGE = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -61,6 +64,18 @@ function ref(source: Record<string, unknown>, key: string, fallback: string): st
   return value;
 }
 
+function commands(source: Record<string, unknown>, key: string, required: boolean): readonly string[] {
+  const value = source[key] ?? [];
+  if (
+    !Array.isArray(value) ||
+    (required && value.length === 0) ||
+    value.some((command) => typeof command !== "string" || command.trim() === "")
+  ) {
+    throw new TaskSpecError(`${key} must be a ${required ? "non-empty " : ""}list of shell commands`);
+  }
+  return value;
+}
+
 function parseChange(value: unknown): Change {
   if (!isRecord(value)) throw new TaskSpecError("change must be an object");
   if (value["kind"] === "shell") return { kind: "shell", run: text(value, "run") };
@@ -85,13 +100,9 @@ export function parseTask(value: unknown): TaskSpec {
   if (!isRecord(value)) throw new TaskSpecError("task must be a JSON object");
   const repo = text(value, "repo");
   if (!REPO.test(repo)) throw new TaskSpecError(`repo must look like owner/name: ${repo}`);
-  const verify = value["verify"];
-  if (
-    !Array.isArray(verify) ||
-    verify.length === 0 ||
-    verify.some((command) => typeof command !== "string" || command.trim() === "")
-  ) {
-    throw new TaskSpecError("verify must be a non-empty list of shell commands");
+  const packages = value["packages"] ?? [];
+  if (!Array.isArray(packages) || packages.some((name) => typeof name !== "string" || !PACKAGE.test(name))) {
+    throw new TaskSpecError("packages must be a list of package names");
   }
   const autoMerge = value["autoMerge"] ?? false;
   if (typeof autoMerge !== "boolean") throw new TaskSpecError("autoMerge must be a boolean");
@@ -101,8 +112,10 @@ export function parseTask(value: unknown): TaskSpec {
     base: ref(value, "base", "main"),
     title,
     body: text(value, "body", title),
+    packages,
+    setup: commands(value, "setup", false),
     change: parseChange(value["change"]),
-    verify,
+    verify: commands(value, "verify", true),
     autoMerge,
     branchPrefix: ref(value, "branchPrefix", "factory/"),
   };

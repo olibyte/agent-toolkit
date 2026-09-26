@@ -30,18 +30,22 @@ cd factory && npm install && npm run check   # tsc --noEmit plus node --test
   "base": "main",
   "title": "PR title and commit subject",
   "body": "PR body (defaults to the title)",
+  "packages": ["python3.12"],
+  "setup": ["npm ci"],
   "change": { "kind": "shell", "run": "echo hi > HELLO.md" },
   "verify": ["test -s HELLO.md"],
   "autoMerge": false
 }
 ```
 
+- `packages` (optional) lists Amazon Linux packages that root installs with `dnf` before the clone. The local worker skips them.
+- `setup` (optional) lists commands that run in the repo after the clone and before the change, for example a toolchain or `npm ci`. Tools installed under `~/.local` stay on `PATH` for later phases. [`examples/toolchain.task.json`](examples/toolchain.task.json) installs Node from the official tarball this way.
 - `change.kind: "agent"` runs a coding agent instead: `{ "kind": "agent", "harness": "claude-code" | "codex", "prompt": "...", "model"?: "...", "escalationModel"?: "..." }`. Claude Code defaults to `sonnet`, a cost-efficient model. Codex uses its own default. When `escalationModel` is set, a failed verification gets exactly one retry on that model, with the failing output added to the prompt.
 - An agent that needs a human writes `{"status":"blocked","reason":"...","question":"..."}` to `$FACTORY_SIGNAL_FILE`. The run then ends in `blocked` and the worker is released.
-- Every phase receives `FACTORY_RUN_ID` and `FACTORY_BRANCH`. The branch is `factory/<run-id>`.
+- Every task command receives `FACTORY_RUN_ID` and `FACTORY_BRANCH`. The branch is `factory/<run-id>`.
 - With `autoMerge: true`, the run calls `gh pr merge --auto --squash`. The repo must allow auto-merge. If it does not, the run logs a warning and still completes.
 
-Examples: [`examples/proof.task.json`](examples/proof.task.json) and [`examples/agent.task.json`](examples/agent.task.json).
+Examples: [`examples/proof.task.json`](examples/proof.task.json), [`examples/agent.task.json`](examples/agent.task.json), and [`examples/toolchain.task.json`](examples/toolchain.task.json) (EC2 only).
 
 ## Run
 
@@ -62,7 +66,7 @@ Everything a run writes stays under `.factory/runs/`, which is gitignored. Run h
 - `.factory/runs/last-run.md`: a readable summary of the latest run, for the next agent or person.
 - `.factory/runs/<id>/`: phase logs and `events.jsonl`.
 
-The local worker runs agent tasks with permission prompts disabled, on your machine. Use it for shell tasks, or for agents you already trust there.
+The local worker runs every task command as you, on your machine, with agent permission prompts disabled. It has none of the EC2 worker's isolation. Use it for shell tasks, or for agents you already trust there.
 
 ## EC2 setup
 
@@ -106,7 +110,7 @@ The separate account keeps agent-launched instances, IAM roles, and spend away f
    export FACTORY_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
    ```
 
-4. Run with `--worker ec2`. The region comes from `--region`, `AWS_REGION`, or the profile. A trivial run takes a few minutes on a `t3.small`. `--instance-type t4g.small` picks the arm64 image.
+4. Run with `--worker ec2`. The region comes from `--region`, `AWS_REGION`, or the profile. A trivial run takes a few minutes on a `t3.small`. `--instance-type t4g.small` picks the arm64 image. `--volume-gb` sets the encrypted gp3 root volume, which defaults to 20 GiB.
 
 The controller's credentials need `ec2:DescribeSecurityGroups`, `ec2:RunInstances`, `ec2:CreateTags`, `ec2:DescribeInstances`, `ec2:TerminateInstances`, `iam:PassRole` on the worker role, `ssm:SendCommand`, `ssm:GetCommandInvocation`, and `ssm:DescribeInstanceInformation`.
 
@@ -115,8 +119,9 @@ The controller's credentials need `ec2:DescribeSecurityGroups`, `ec2:RunInstance
 - The worker has no key pair and no inbound rules, and IMDSv2 is required. It reaches GitHub and SSM through egress only.
 - The worker role has `AmazonSSMManagedInstanceCore`, plus `ssm:GetParameter` on `/agent-factory/*`. An explicit Deny blocks every other parameter.
 - Secrets never appear in user-data, SSM command parameters, state, or logs. The Slack webhook never leaves the controller.
-- Only `prepare` and `publish` see the GitHub token. The task's `change` and `verify` commands run with it unset. Agent API keys are exported only in `change`, because the agent needs them.
-- Known limit: task code runs as root, so it can still use the instance role to read `/agent-factory/*`. Keep the GitHub token scoped to one sandbox repo until tasks run as an unprivileged user with IMDS blocked (the next hardening step).
+- Everything the task defines (`setup`, `change`, `verify`) runs as the unprivileged user `factory-task`, with an environment that holds only `HOME`, `PATH`, `LANG`, and the git config. An nftables rule blocks that user from instance metadata, so task code cannot get the instance role's credentials or read `/agent-factory/*`. `prepare` fails if the block is not in place.
+- Only root reads the GitHub token, in `prepare` and `publish`. The agent's API key is passed to the task user only in `change`, because the agent needs it.
+- Root never runs git in the task's repo, so a hook or `.git/config` entry that the task plants cannot run next to the token. `publish` reads a patch from the task user and applies it to root's own clone of the base commit, then pushes from that clone.
 - User-data schedules `shutdown -h +90` with shutdown behavior `terminate`. If the controller dies, the instance still ends within 90 minutes. Ctrl-C runs cleanup, and `cleanup <run-id>` covers anything left over.
 - To find stray workers: `aws ec2 describe-instances --filters Name=tag-key,Values=agent-factory:run Name=instance-state-name,Values=pending,running`.
 

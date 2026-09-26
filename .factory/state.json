@@ -102,14 +102,16 @@
       {
         "id": "T13",
         "title": "Task setup step (toolchain and deps) plus a root volume size option",
-        "status": "todo",
-        "dependsOn": []
+        "status": "done",
+        "dependsOn": [],
+        "evidence": "run 20260926-024319-c00d: python3.12 via packages, Node 24 via setup, 20 GiB root; olibyte/agent-factory-sandbox#4"
       },
       {
         "id": "T14",
         "title": "Run change and verify as an unprivileged user with IMDS blocked",
-        "status": "todo",
-        "dependsOn": []
+        "status": "done",
+        "dependsOn": [],
+        "evidence": "run 20260926-024319-c00d: verify ran as factory-task (uid 1001), IMDS unreachable, aws sts found no credentials; publish applied the patch to root's clone"
       },
       {
         "id": "T15",

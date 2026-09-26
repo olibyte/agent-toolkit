@@ -12,6 +12,8 @@ const task: TaskSpec = {
   base: "main",
   title: "Trivial change",
   body: "Trivial change",
+  packages: [],
+  setup: [],
   change: { kind: "shell", run: "date > PROOF.md" },
   verify: ["test -s PROOF.md"],
   autoMerge: false,

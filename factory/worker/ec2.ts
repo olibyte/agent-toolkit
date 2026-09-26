@@ -6,6 +6,9 @@ import type { PhaseResult, WorkerProvider, WorkerRef } from "./types.ts";
 export const GH_VERSION = "2.97.0";
 export const NODE_VERSION = "24.18.0";
 export const WORKDIR = "/opt/agent-factory";
+export const TASK_USER = "factory-task";
+const TASK_HOME = `/home/${TASK_USER}`;
+const IMDS = { ipv4: "169.254.169.254", ipv6: "fd00:ec2::254" } as const;
 
 const AGENT_PACKAGE: Readonly<Record<AgentHarness, { bin: string; pkg: string; skillsAgent: string }>> = {
   "claude-code": { bin: "claude", pkg: "@anthropic-ai/claude-code", skillsAgent: "claude-code" },
@@ -59,6 +62,7 @@ export interface Ec2WorkerConfig {
   readonly securityGroupId: string;
   readonly subnetId: string | null;
   readonly instanceType: string;
+  readonly volumeGb: number;
   readonly imageId: string;
   readonly parameterPrefix: string;
   readonly maxLifetimeMinutes: number;
@@ -97,7 +101,7 @@ export function infraNames(name: string) {
 
 export async function loadEc2Config(
   aws: AwsCli,
-  options: { readonly region: string; readonly name: string; readonly instanceType: string }
+  options: { readonly region: string; readonly name: string; readonly instanceType: string; readonly volumeGb: number }
 ): Promise<Ec2WorkerConfig> {
   const names = infraNames(options.name);
   const described = await aws(
@@ -119,6 +123,7 @@ export async function loadEc2Config(
     securityGroupId: pickString(described, ["SecurityGroups", 0, "GroupId"], "describe-security-groups"),
     subnetId: null,
     instanceType: options.instanceType,
+    volumeGb: options.volumeGb,
     imageId: imageFor(options.instanceType),
     parameterPrefix: names.parameterPrefix,
     maxLifetimeMinutes: 90,
@@ -194,6 +199,13 @@ export function ec2WorkerProvider(config: Ec2WorkerConfig, deps: Ec2Deps): Worke
           "terminate",
           "--metadata-options",
           "HttpTokens=required,HttpEndpoint=enabled",
+          "--block-device-mappings",
+          JSON.stringify([
+            {
+              DeviceName: "/dev/xvda",
+              Ebs: { VolumeSize: config.volumeGb, VolumeType: "gp3", Encrypted: true, DeleteOnTermination: true },
+            },
+          ]),
           "--user-data",
           userData(config.maxLifetimeMinutes),
           "--tag-specifications",
@@ -233,6 +245,14 @@ export function ec2WorkerProvider(config: Ec2WorkerConfig, deps: Ec2Deps): Worke
           `export AWS_REGION=${shq(region)} AWS_DEFAULT_REGION=${shq(region)}`,
           `export GIT_CONFIG_GLOBAL=${shq(`${WORKDIR}/gitconfig`)}`,
           `factory_secret() { aws ssm get-parameter --name ${shq(`${config.parameterPrefix}/`)}"$1" --with-decryption --query Parameter.Value --output text 2>/dev/null; }`,
+          "factory_task() {",
+          '  local script="$1" name',
+          "  shift",
+          `  local -a env=(HOME=${TASK_HOME} USER=${TASK_USER} LOGNAME=${TASK_USER} SHELL=/bin/bash LANG=C.UTF-8 "PATH=${TASK_HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin" "GIT_CONFIG_GLOBAL=$GIT_CONFIG_GLOBAL")`,
+          '  for name in "$@"; do if [ -n "${!name:-}" ]; then env+=("$name=${!name}"); fi; done',
+          `  (cd ${TASK_HOME} && setpriv --reuid=${TASK_USER} --regid=${TASK_USER} --init-groups -- env -i "\${env[@]}" bash -c "$script")`,
+          "}",
+          `factory_task_owns() { chown -R ${TASK_USER}: "$@"; }`,
         ].join("\n"),
         githubAuth: [
           `GH_TOKEN="$(factory_secret github-token)" || { echo ${shq(`cannot read SSM parameter ${secret("github-token")}`)} >&2; exit 1; }`,
@@ -249,7 +269,15 @@ export function ec2WorkerProvider(config: Ec2WorkerConfig, deps: Ec2Deps): Worke
           "fi",
           "git --version",
           "gh --version | head -n 1",
+          `id -u ${TASK_USER} >/dev/null 2>&1 || useradd --create-home --shell /bin/bash ${TASK_USER}`,
+          "command -v nft >/dev/null || dnf install -y -q nftables",
+          `task_uid="$(id -u ${TASK_USER})"`,
+          "nft delete table inet agent_factory 2>/dev/null || true",
+          `printf '%s\\n' 'table inet agent_factory {' '  chain output {' '    type filter hook output priority filter; policy accept;' "    meta skuid $task_uid ip daddr ${IMDS.ipv4} reject" "    meta skuid $task_uid ip6 daddr ${IMDS.ipv6} reject" '  }' '}' | nft -f -`,
+          `factory_task 'echo "task commands run as $(id -un), uid $(id -u)"'`,
+          `if factory_task ${shq(`curl -s -m 5 -o /dev/null http://${IMDS.ipv4}/`)}; then echo ${shq(`${TASK_USER} can reach instance metadata`)} >&2; exit 1; fi`,
         ].join("\n"),
+        installPackages: (packages) => `dnf install -y -q ${packages.map(shq).join(" ")}`,
         agentSetup(harness) {
           const agent = AGENT_PACKAGE[harness];
           return [
@@ -258,7 +286,7 @@ export function ec2WorkerProvider(config: Ec2WorkerConfig, deps: Ec2Deps): Worke
             `  curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-\${node_arch}.tar.xz" | tar -xJ -C /usr/local --strip-components=1`,
             "fi",
             `command -v ${agent.bin} >/dev/null || npm install -g --silent ${agent.pkg}`,
-            `npx --yes skills@latest add olibyte/agent-toolkit -g -a ${agent.skillsAgent} -y > /dev/null`,
+            `factory_task ${shq(`npx --yes skills@latest add olibyte/agent-toolkit -g -a ${agent.skillsAgent} -y > /dev/null`)}`,
           ].join("\n");
         },
       };
@@ -266,9 +294,12 @@ export function ec2WorkerProvider(config: Ec2WorkerConfig, deps: Ec2Deps): Worke
 
     async exec(ref, phase, script, timeoutSeconds): Promise<PhaseResult> {
       const { instanceId } = ec2Ref(ref);
-      const file = `/tmp/agent-factory-${phase}.sh`;
       const parameters = {
-        commands: [`echo ${Buffer.from(script).toString("base64")} | base64 -d > ${file}`, `bash ${file}`],
+        commands: [
+          'script="$(mktemp)"',
+          `echo ${Buffer.from(script).toString("base64")} | base64 -d > "$script"`,
+          'bash "$script"',
+        ],
         executionTimeout: [String(timeoutSeconds)],
       };
       const sent = await aws(

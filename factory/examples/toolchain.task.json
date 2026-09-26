@@ -1,0 +1,22 @@
+{
+  "repo": "olibyte/agent-factory-sandbox",
+  "title": "factory: record toolchain proof",
+  "body": "Checks the task toolchain, the root volume, and the task user's isolation on an EC2 worker. Safe to close without merging.",
+  "packages": ["python3.12"],
+  "setup": [
+    "arch=\"$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')\" && mkdir -p ~/.local && curl -fsSL \"https://nodejs.org/dist/v24.18.0/node-v24.18.0-linux-$arch.tar.xz\" | tar -xJ -C ~/.local --strip-components=1",
+    "node --version && python3.12 --version"
+  ],
+  "change": {
+    "kind": "shell",
+    "run": "mkdir -p proofs && node -e 'const os = require(\"os\"); console.log(JSON.stringify({ run: process.env.FACTORY_RUN_ID, user: os.userInfo().username, node: process.version }))' > \"proofs/$FACTORY_RUN_ID.json\""
+  },
+  "verify": [
+    "test \"$(id -u)\" -ne 0",
+    "! curl -s -m 5 -o /dev/null http://169.254.169.254/",
+    "! aws sts get-caller-identity",
+    "test \"$(df -BG --output=size / | tail -n 1 | tr -dc 0-9)\" -ge 19",
+    "python3.12 -c 'import sys; assert sys.version_info >= (3, 12)'",
+    "node -e 'require(\"./proofs/\" + process.env.FACTORY_RUN_ID + \".json\")'"
+  ]
+}

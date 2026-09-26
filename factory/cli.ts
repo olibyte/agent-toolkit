@@ -28,6 +28,7 @@ options:
   --region REGION        AWS region (default $AWS_REGION, $AWS_DEFAULT_REGION, then the profile's region)
   --name NAME            name prefix used by factory/infra (default agent-factory)
   --instance-type TYPE   EC2 instance type (default t3.small)
+  --volume-gb GB         EC2 root volume size in GiB (default 20)
 
 environment:
   FACTORY_SLACK_WEBHOOK_URL   Slack Incoming Webhook URL. Unset means console output only.
@@ -136,7 +137,13 @@ export async function cleanup(
   return run;
 }
 
-type RunFlags = AwsFlags & Readonly<Partial<Record<"worker" | "name" | "instance-type", string>>>;
+type RunFlags = AwsFlags & Readonly<Partial<Record<"worker" | "name" | "instance-type" | "volume-gb", string>>>;
+
+function volumeGb(flag: string | undefined): number {
+  const size = Number(flag ?? "20");
+  if (!Number.isInteger(size) || size < 8) throw new UsageError(`--volume-gb must be a whole number of GiB, at least 8: ${flag}`);
+  return size;
+}
 
 async function runTaskCommand(positionals: readonly string[], values: RunFlags, io: Io, stateDir: string) {
   const [taskPath] = positionals;
@@ -165,6 +172,7 @@ async function runTaskCommand(positionals: readonly string[], values: RunFlags, 
       region: await awsRegion(values),
       name: values.name ?? "agent-factory",
       instanceType: values["instance-type"] ?? "t3.small",
+      volumeGb: volumeGb(values["volume-gb"]),
     });
     worker = ec2WorkerProvider(config, { aws });
   }
@@ -220,6 +228,7 @@ export async function main(argv: readonly string[], io: Io = processIo): Promise
         profile: { type: "string" },
         name: { type: "string" },
         "instance-type": { type: "string" },
+        "volume-gb": { type: "string" },
         help: { type: "boolean", short: "h" },
       },
     });

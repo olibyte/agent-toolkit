@@ -35,6 +35,7 @@ const config: Ec2WorkerConfig = {
   securityGroupId: "sg-123",
   subnetId: null,
   instanceType: "t3.small",
+  volumeGb: 20,
   imageId: imageFor("t3.small"),
   parameterPrefix: "/agent-factory",
   maxLifetimeMinutes: 90,
@@ -61,6 +62,9 @@ describe("ec2 worker provider", () => {
     assert.equal(flag(args, "--metadata-options"), "HttpTokens=required,HttpEndpoint=enabled");
     assert.match(flag(args, "--user-data") ?? "", /shutdown -h \+90/);
     assert.match(flag(args, "--image-id") ?? "", /al2023-ami-kernel-default-x86_64$/);
+    assert.deepEqual(JSON.parse(flag(args, "--block-device-mappings") ?? "[]"), [
+      { DeviceName: "/dev/xvda", Ebs: { VolumeSize: 20, VolumeType: "gp3", Encrypted: true, DeleteOnTermination: true } },
+    ]);
     assert.equal(args.includes("--key-name"), false);
     assert.equal(args.includes("--subnet-id"), false);
     const tags = JSON.parse(flag(args, "--tag-specifications") ?? "[]");
@@ -104,9 +108,10 @@ describe("ec2 worker provider", () => {
     assert.equal(flag(send, "--instance-ids"), "i-abc");
     const parameters = JSON.parse(flag(send, "--parameters") ?? "{}");
     assert.deepEqual(parameters.executionTimeout, ["1800"]);
-    const encoded = /^echo (\S+) \| base64 -d > \/tmp\/agent-factory-verify.sh$/.exec(parameters.commands[0])?.[1];
+    assert.equal(parameters.commands[0], 'script="$(mktemp)"');
+    const encoded = /^echo (\S+) \| base64 -d > "\$script"$/.exec(parameters.commands[1])?.[1];
     assert.equal(Buffer.from(encoded ?? "", "base64").toString(), script);
-    assert.equal(parameters.commands[1], "bash /tmp/agent-factory-verify.sh");
+    assert.equal(parameters.commands[2], 'bash "$script"');
   });
 
   it("maps an SSM timeout to exit 124 with the status detail", async () => {
@@ -148,7 +153,15 @@ describe("ec2 worker provider", () => {
 
   it("renders a worker environment that is valid bash and holds no secret values", async () => {
     const environment = ec2WorkerProvider(config, fakeAws({}).deps).environment(ref);
-    for (const part of [environment.preamble, environment.githubAuth, environment.setup, environment.agentSetup("claude-code"), environment.agentSetup("codex")]) {
+    const parts = [
+      environment.preamble,
+      environment.githubAuth,
+      environment.setup,
+      environment.installPackages(["python3.12", "gcc-c++"]),
+      environment.agentSetup("claude-code"),
+      environment.agentSetup("codex"),
+    ];
+    for (const part of parts) {
       const syntax = await runCommand(["bash", "-n"], { input: part });
       assert.equal(syntax.code, 0, syntax.stderr);
     }
@@ -158,15 +171,39 @@ describe("ec2 worker provider", () => {
     assert.match(environment.githubAuth, /GH_TOKEN="\$\(factory_secret github-token\)"/);
     assert.match(environment.setup, /gh_2\.97\.0_linux_/);
     assert.match(environment.agentSetup("codex"), /@openai\/codex/);
+    assert.match(environment.agentSetup("codex"), /factory_task 'npx --yes skills@latest add/);
+    assert.match(environment.setup, /useradd --create-home --shell \/bin\/bash factory-task/);
+    assert.match(environment.setup, /meta skuid \$task_uid ip daddr 169\.254\.169\.254 reject/);
+    assert.match(environment.setup, /if factory_task 'curl -s -m 5 -o \/dev\/null http:\/\/169\.254\.169\.254\/'; then .* exit 1; fi/);
+    assert.equal(environment.installPackages(["python3.12", "gcc-c++"]), "dnf install -y -q 'python3.12' 'gcc-c++'");
+  });
+
+  it("runs task commands with a clean environment that carries only the named variables", async () => {
+    const environment = ec2WorkerProvider(config, fakeAws({}).deps).environment(ref);
+    const script = [
+      environment.preamble,
+      'setpriv() { while [ "$1" != -- ]; do shift; done; shift; "$@"; }',
+      "cd() { builtin cd /; }",
+      "export GH_TOKEN=secret ANTHROPIC_API_KEY=key AWS_PROFILE=admin",
+      `factory_task 'echo "\${GH_TOKEN:-none} \${ANTHROPIC_API_KEY:-none} \${AWS_PROFILE:-none} $USER $HOME $PATH"' ANTHROPIC_API_KEY`,
+      `factory_task 'echo "\${ANTHROPIC_API_KEY:-none} $GIT_CONFIG_GLOBAL"'`,
+    ].join("\n");
+    const result = await runCommand(["bash", "-c", script]);
+    assert.equal(result.code, 0, result.stderr);
+    assert.deepEqual(result.stdout.trim().split("\n"), [
+      "none key none factory-task /home/factory-task /home/factory-task/.local/bin:/usr/local/bin:/usr/bin:/bin",
+      "none /opt/agent-factory/gitconfig",
+    ]);
   });
 });
 
 describe("ec2 config", () => {
   it("finds the Terraform-managed worker resources by name", async () => {
     const fake = fakeAws({ "ec2 describe-security-groups": [{ SecurityGroups: [{ GroupId: "sg-9" }] }] });
-    const loaded = await loadEc2Config(fake.aws, { region: "eu-west-2", name: "agent-factory", instanceType: "t4g.small" });
+    const loaded = await loadEc2Config(fake.aws, { region: "eu-west-2", name: "agent-factory", instanceType: "t4g.small", volumeGb: 30 });
     assert.equal(loaded.instanceProfile, "agent-factory-worker");
     assert.equal(loaded.securityGroupId, "sg-9");
+    assert.equal(loaded.volumeGb, 30);
     assert.equal(loaded.parameterPrefix, "/agent-factory");
     assert.equal(loaded.subnetId, null);
     assert.match(loaded.imageId, /arm64$/);
@@ -179,12 +216,12 @@ describe("ec2 config", () => {
   it("points at terraform when the infrastructure is missing, and refuses ambiguity", async () => {
     const missing = fakeAws({ "ec2 describe-security-groups": [{ SecurityGroups: [] }] });
     await assert.rejects(
-      loadEc2Config(missing.aws, { region: "r", name: "agent-factory", instanceType: "t3.small" }),
+      loadEc2Config(missing.aws, { region: "r", name: "agent-factory", instanceType: "t3.small", volumeGb: 20 }),
       /no security group named agent-factory-worker in r\. Run terraform apply in factory\/infra first/
     );
     const twice = fakeAws({ "ec2 describe-security-groups": [{ SecurityGroups: [{ GroupId: "a" }, { GroupId: "b" }] }] });
     await assert.rejects(
-      loadEc2Config(twice.aws, { region: "r", name: "agent-factory", instanceType: "t3.small" }),
+      loadEc2Config(twice.aws, { region: "r", name: "agent-factory", instanceType: "t3.small", volumeGb: 20 }),
       /2 security groups/
     );
   });
