@@ -23,7 +23,7 @@ Make the factory safe and capable enough to build a real app. T13 (task toolchai
 
 ## Current work
 
-- The PR for `feat/factory-setup-and-hardening` (T13 and T14) is open for review.
+- olibyte/agent-toolkit#6 (T13 and T14) is open for review.
 
 ## Important decisions
 
@@ -43,7 +43,7 @@ Make the factory safe and capable enough to build a real app. T13 (task toolchai
 
 ## Open PRs
 
-- Branch `feat/factory-setup-and-hardening` in olibyte/agent-toolkit (T13 and T14).
+- olibyte/agent-toolkit#6 (T13 and T14), branch `feat/factory-setup-and-hardening`.
 - olibyte/agent-factory-sandbox#4, the toolchain proof. Close it and delete its branch after the agent-toolkit PR merges.
 
 ## Next recommended action
