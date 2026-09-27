@@ -117,6 +117,37 @@ The operator answered T21's open questions on 2026-09-27, before merging it. The
 - **Verify.** Still five commands, adjusted from T21. The headings add Decisions. There are 1000 to 3000 words and 20 to 40 functional requirements. The functional requirements must cover sign-up, sign-in, sign-out, account deletion, and members. Decisions has at least 7 bullets, each citing an ID, and names the north star. Open questions shrink to 0 to 5. The deny list no longer blocks "password", but still blocks every other sign-in method, provider, and library.
 - **Checked before the run.** On a clean clone of `main`, `setup` downloaded the draft (99 lines), and the unrevised draft failed the headings and sign-up checks as it should. A revised sample (1350 words, 28 functional requirements) passed all five commands. Ten mutations each failed: no Decisions section, a decision with no ID, no north star, no sign-up, no account deletion, no sign-out, a hashing algorithm named, another sign-in method named, 6 open questions, and 19 functional requirements. The first sample showed that the Decisions check required "sign in" spelled exactly, so it now accepts "sign-in" too.
 
+### Benchmark architecture (T23)
+
+The third planning step turns the merged brief and requirements (#5, `08fa0a7`) into `docs/architecture.md`. The later steps (data model, API and security decisions, acceptance tests, task graph) cite its decisions as `AD-01` onwards, so, as with the requirements, the IDs and their format are the interface.
+
+- **Calls made here, from facts the agent can't see.** CI has no database service or secrets, and the factory worker is Amazon Linux 2023 with no Docker and no browsers. Both run `npm ci`, lint, build, and test. So persistence is SQLite in a local file, tests run in Vitest with no browser end-to-end tests, and no hosted service is needed at runtime. Deployment and hosting are out of scope, and the agent raises them as an open question for Human Gate #1. npm 11.16 skips a package's install scripts unless `package.json` approves them (`allowScripts`), which matters for native modules. Node 24's built-in `node:sqlite` works without a flag.
+- **Left to the agent**, each with a reason: the SQLite driver and data-access layer, a maintained auth library or a small session implementation of its own, Server Actions or Route Handlers, where access checks sit, and the module layout. The agent reads the Next.js 16 guides in `node_modules/next/dist/docs/` first, so `setup` installs Node 24 and runs `npm ci`. Tables and columns belong to the data model step. Session lifetime, cookie settings, hashing parameters, and rate limits belong to the security step.
+- **Format.** There are 6 to 15 one-line decisions, `- **AD-01** ...`, and each cites the requirements it serves. A Requirement coverage table lists every FR and NFR individually, with the decisions that meet it. A Dependencies table lists each new npm package with its purpose and decision.
+- **Task.** `.factory/tasks/benchmark-architecture.task.json`, one run, one PR, on a `t3.small`. Claude Code runs on `sonnet` with an `opus` retry.
+- **Verify.** Six commands:
+  1. The only change is `docs/architecture.md`.
+  2. The headings are exact and in order, with a blank line after each one, 1200 to 3500 words, and no placeholders or emoji. Code blocks are ignored when finding headings.
+  3. Decision IDs are sequential and each one cites a requirement. Every cited FR, NFR, or AD exists, and the coverage table covers exactly the requirement IDs in `docs/requirements.md`.
+  4. The content covers:
+     - **Decisions:** SQLite, sessions, passwords, Vitest, and Server Actions or Route Handlers.
+     - **Constraints:** Node 24 and Amazon Linux.
+     - **Request flow:** cites NFR-01.
+     - **Testing:** names `npm test` and NFR-05.
+     - **Module layout:** a code block.
+     - **Other sections:** deployment is raised, there are at least 2 assumptions, and there are 1 to 6 open questions, each citing an ID and ending with `?`.
+  5. A deny list, applied outside Constraints, Out of scope, and Open questions, rejects hosted databases, cloud services, containers, browser test tools, GraphQL and tRPC, live transport, and other sign-in methods.
+  6. Each package in the Dependencies table exists on the npm registry (`npm view`), is not already in `package.json`, and names a decision.
+- **Checked before the run.** Against a clone of the benchmark's `main` at `08fa0a7`, with its packages installed, a sample document passed all six commands. The first try showed the deny list flagging "no Docker" in Constraints, a fact the prompt asks for, so Constraints is exempt too. Eighteen mutations each failed only the command meant to catch them:
+  - **Only change:** an extra file.
+  - **Headings:** a renamed heading.
+  - **IDs and coverage:** a decision ID gap, a decision citing no requirement, an unknown FR, a coverage table missing an ID, a range instead of IDs, and a coverage row with no decision.
+  - **Content:** no SQLite in Decisions, no NFR-01 in Request flow, no deployment question, 7 open questions, and a question with no ID.
+  - **Deny list:** PostgreSQL, and Playwright.
+  - **Dependencies:** a package that doesn't exist, one already installed, and one with no decision.
+
+  A `#` comment inside the code block still passed, as it should.
+
 ## Reuse
 
 - **`gh` and `aws` CLIs** instead of SDKs. This matches `watch-pr/github.ts`, which already shells out to `gh`.
@@ -149,6 +180,7 @@ The operator answered T21's open questions on 2026-09-27, before merging it. The
 | T20 | Benchmark product brief from the product intent, through the factory | T16 |
 | T21 | Benchmark requirements from the product brief, through the factory | T20 |
 | T22 | Benchmark requirements revised with the operator's answers, through the factory | T21 |
+| T23 | Benchmark architecture from the brief and requirements, through the factory | T22 |
 
 ## Out of scope
 
