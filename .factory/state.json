@@ -1,7 +1,7 @@
 {
   "version": 1,
   "work": {
-    "goal": "Make the factory ready for a real app: task toolchain setup, worker hardening, agent proof on EC2",
+    "goal": "Run real-app tasks through the factory: the benchmark scaffold is done, product planning is next",
     "plan": ".factory/plan.md",
     "tasks": [
       {
@@ -126,10 +126,11 @@
       {
         "id": "T16",
         "title": "First real-app task: create the repo, grant the worker token, scaffold through the factory",
-        "status": "todo",
+        "status": "done",
         "dependsOn": [
           "T15"
-        ]
+        ],
+        "evidence": "run 20260927-011023-06e6: Claude Code (sonnet) scaffolded Next.js 16.3.6 on a t3.medium in about 7.5 minutes with no escalation; 14 verify commands passed (npm ci, lint, build, vitest, ignore checks, 22 pinned skills); olibyte/agent-factory-benchmark#1"
       },
       {
         "id": "T17",

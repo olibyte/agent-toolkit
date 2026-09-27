@@ -4,7 +4,7 @@ Read this file, `.factory/plan.md`, and `.factory/state.json` (the task list) be
 
 ## Current goal
 
-Make the factory safe and capable enough to build a real app. T13 (task toolchain) and T14 (worker hardening) are merged (olibyte/agent-toolkit#6) and proven on EC2. T15, the agent proof on EC2, is done. Next is the first real-app task (T16). The tasks are T13 to T18 in `.factory/state.json`.
+Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory. It is a deliberately small task tracker that tests the factory workflow, not application complexity. T16, the scaffold, is done. Next is the planning phase: product brief, factory-generated requirements, architecture, data model, API, and security decisions, acceptance tests, a dependency-aware task graph, Human Gate #1, then parallel implementation. The tasks are in `.factory/state.json`.
 
 ## Completed work
 
@@ -20,11 +20,17 @@ Make the factory safe and capable enough to build a real app. T13 (task toolchai
   - Tests cover a hook planted in the task repo (it never runs), and a patch forged through `diff.external` that writes into `.git` (publish refuses it). A mutation that publishes from the task repo makes the hook test fail.
   - EC2 proof: run `20260926-024319-c00d` of `factory/examples/toolchain.task.json` completed in 2m12s on a `t3.small`. Task commands ran as `factory-task` (uid 1001). `curl` to IMDS failed and `aws sts get-caller-identity` found no credentials. Root was at least 19 GiB. Setup installed Python 3.12.14 from `packages` and Node v24.18.0 into `~/.local`. The run opened olibyte/agent-factory-sandbox#4 with one commit, which is now closed and its branch deleted. The instance is `terminated`, and its volume is gone.
 - T15, the agent proof on EC2: run `20260927-003729-9af5` of `factory/examples/agent.task.json` completed in about 2m40s on a `t3.small`, with no escalation. Claude Code (`sonnet`) ran as `factory-task` and added a `## Usage` section to the sandbox README. The auto-updater's failed global writes did not break the run. The task gained a second verify command, `test -f ~/.claude/skills/handoff/SKILL.md`, which passed as `factory-task`, so the skills install lands in `/home/factory-task/.claude`. The agent can see verify commands in its prompt, and it reported that the file already existed. The run opened olibyte/agent-factory-sandbox#5 with one commit (README.md +4). The instance is `terminated`, and no factory instances remain. The Anthropic API key is in `/agent-factory/anthropic-api-key`. Its spend limit is set in the Anthropic Console, because the AWS budget does not cover API spend.
+- T16, the first real-app task, with the design in `.factory/plan.md` under "First real app: benchmark scaffold (T16)":
+  - `olibyte/agent-factory-benchmark` is public, created with a README commit. The operator added it to the worker's fine-grained token.
+  - Run `20260927-011023-06e6` of `.factory/tasks/benchmark-scaffold.task.json` completed in about 7.5 minutes on a `t3.medium`, with no escalation. `setup` installed Node v24.18.0 (npm 11.16.0) into `~/.local`. Claude Code (`sonnet`) spent about 5 minutes on the change, then all 14 verify commands passed as `factory-task`: `npm ci`, lint, `next build`, the Vitest smoke test, the ignore checks, and 22 skills at their pinned commits in `skills-lock.json`.
+  - It opened olibyte/agent-factory-benchmark#1 with one commit: 244 files, +31567 lines, of which 226 paths are the vendored skills. The commit has no `node_modules`, `.next`, `next-env.d.ts`, CI, or product code. The PR diff is too large for GitHub's diff API (20,000-line limit), so review it from a clone.
+  - A clean clone of the PR branch also passed `npm ci`, lint, build, and test on the operator's Mac, and the tree stayed clean. Every Slack event was delivered with no sink failures. The instance is `terminated`, and no factory instances or volumes remain.
+  - `publish` warned about trailing whitespace in vendored Vercel skill files. `git apply` accepted it, and it is harmless.
 - Codex reviewed `factory/` read-only. Two findings were fixed: the GitHub token is now visible only in `prepare` and `publish`, and SIGINT cleanup waits for an in-flight launch. One finding was rejected: the `factory_secret` failure path never echoes the value.
 
 ## Current work
 
-- T16, the first real-app task. The design is in `.factory/plan.md` under "First real app: benchmark scaffold (T16)", and the task is `.factory/tasks/benchmark-scaffold.task.json`. Run it with `node factory/cli.ts run .factory/tasks/benchmark-scaffold.task.json --worker ec2 --instance-type t3.medium`. It needs `olibyte/agent-factory-benchmark` to exist, with the worker token granted access to it.
+- None in progress.
 
 ## Important decisions
 
@@ -36,6 +42,7 @@ Make the factory safe and capable enough to build a real app. T13 (task toolchai
 - The user asked for Terraform, not CloudFormation, so `factory/infra/` replaced the CloudFormation template before anything was deployed. Resources have fixed names (`agent-factory-worker`, `/agent-factory/`), and the CLI finds the security group by name instead of reading Terraform state. State stays local and gitignored for now.
 - AWS access: a dedicated member account under IAM Identity Center, with the `agent-factory` SSO profile. `FACTORY_AWS_PROFILE` scopes that profile to factory commands only, so other tools keep their own AWS settings. No root keys.
 - Root runs only controller-rendered steps. Everything the task defines runs as `factory-task`, which is blocked from IMDS. Data crosses from the task user to root only as stdout of a process that runs as the task user (the blocked signal and the patch). Root treats that data as untrusted, and `git apply` refuses `.git/`, `..`, and writes through symlinks.
+- Real-app task files live in `.factory/tasks/`, in agent-toolkit. The app repo holds no factory code. App skills are pinned per source to a commit through GitHub tree URLs with `skills@1.7.0`. Use a `t3.medium` or larger for Next.js builds.
 - Remaining limits: the task user has open network egress and holds the agent API key during `change`. Only the Claude Code agent path has run on EC2 (T15). The Codex path has passed `bash -n` and tests only. The local worker runs everything as the operator, with no isolation.
 
 ## Blockers
@@ -44,11 +51,14 @@ Make the factory safe and capable enough to build a real app. T13 (task toolchai
 
 ## Open PRs
 
-- None.
+- olibyte/agent-factory-benchmark#1 (T16 scaffold). Unlike the sandbox proofs, this one is meant to be merged: squash-merge it after review, and before any product task runs.
+- The PR for this branch (T16 docs) in olibyte/agent-toolkit.
 
 ## Next recommended action
 
-1. T16: create the real app's repo, add it to the worker's fine-grained GitHub token, and run the first task (scaffold) through the factory. There is one PR per task.
-2. Later: T17 moves Terraform state to an S3 backend once a second machine or person applies. T18 builds the task tracker, informed by the first real-app tasks.
+1. Merge olibyte/agent-factory-benchmark#1.
+2. Start the planning phase with the operator's `product-brief.md`. Design how the factory turns it into requirements and a task graph before running any product task.
+3. Small follow-ups for the benchmark repo, each as its own factory task: a CI workflow (it needs the worker token's Workflows permission, which only the operator can grant); dropping `vite-tsconfig-paths` for Vite's built-in `resolve.tsconfigPaths`, which Vitest suggests; and a decision on npm's `allow-scripts` warning for `unrs-resolver`.
+4. Later: T17 moves Terraform state to an S3 backend once a second machine or person applies. T18 builds the task tracker, informed by the first real-app tasks.
 
 Follow the original working method. Record a short design for each new task in `.factory/plan.md` before building it, keep interfaces small, and verify against real systems.
