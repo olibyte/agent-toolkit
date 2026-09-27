@@ -48,6 +48,23 @@ The runtime is Node 24's built-in TypeScript type stripping with `node:test`, an
 - **Script transport.** SSM writes each phase script to a `mktemp` file owned by root. It no longer uses a fixed `/tmp` path that the task user could create first.
 - **Local worker.** It renders the same scripts. There, `factory_task` is plain `bash` as the operator, so the local worker gives no isolation.
 
+### First real app: benchmark scaffold (T16)
+
+The benchmark app is a deliberately small task tracker. It tests the factory workflow, not application complexity. T16 only creates the repo and scaffolds it. It adds no product features, and it does not decide persistence, auth, or hosting. Those belong to the later planning phase (product brief, requirements, architecture, acceptance tests, task graph, Human Gate #1).
+
+- **Repo.** `olibyte/agent-factory-benchmark`, public, created with `gh repo create --public --add-readme`. The README commit gives the worker a `main` to clone. The app repo holds no factory code: the controller, the task files, and run records stay in agent-toolkit.
+- **Token.** The worker's fine-grained token (`/agent-factory/github-token`) gets the new repo added under "Only select repositories". Its permissions (Contents and Pull requests, read and write) and its value stay the same, so SSM needs no change. Only the operator can do this, in the GitHub web UI.
+- **Task.** `.factory/tasks/benchmark-scaffold.task.json`, one run, one PR. `packages` and `setup` declare the toolchain: `tar` and `xz`, and Node 24.18.0 in `~/.local`. It does not rely on the Node that the worker installs for the agent CLI. `setup` cannot run `npm ci`, because `package.json` does not exist until the change phase. The change is a Claude Code agent (`sonnet`, with an `opus` retry) that follows exact, pinned commands. The factory's real-app tasks will be agent tasks, so the scaffold uses that path too, and the deterministic verify list is what makes the result trustworthy. The run uses a `t3.medium`, because `next build` can exhaust the 2 GiB of a `t3.small`.
+- **Scaffold scope.** `create-next-app@16.3.6` with TypeScript, Tailwind CSS, ESLint, App Router, no `src/`, the `@/*` alias, npm, and `AGENTS.md`. It generates into a temp dir and is copied in, because it refuses a folder that holds `README.md`. Its `.gitignore` therefore lands before any install. Node 24 comes from `engines`, `.nvmrc`, and `@types/node@^24`. Tests use Vitest with React Testing Library, as the Next.js App Router testing guide describes, plus one smoke test for the home page. The demo page becomes a one-heading placeholder. There is no CI workflow (it would need the token's Workflows permission), and there is no Docker, database, auth, or env file.
+- **Skills, pinned.** The skills CLI is pinned to `skills@1.7.0`, and every source is a GitHub tree URL at a commit. The CLI records that commit as `ref` in `skills-lock.json`, with a content hash for each skill. All sources install for claude-code, cursor, codex, antigravity, and antigravity-cli, in `.agents/skills/` with symlinks in `.claude/skills/`, all committed.
+  - agent-toolkit at `3a69c94` (main after #9): the 15 default skills. `AGENTS.md` joins the toolkit template (from the same commit) with create-next-app's `nextjs-agent-rules` block. `CLAUDE.md` is `@AGENTS.md`.
+  - `vercel-labs/agent-skills` at `063bee9`: `vercel-react-best-practices`, `vercel-composition-patterns`, and `web-design-guidelines`. The deploy, Vercel CLI, and optimize skills wait for the hosting decision, and React Native does not apply.
+  - `vercel/next.js` at the `v16.3.6` tag (`a758ffc`), matching the installed Next.js: 4 skills, including `next-dev-loop`.
+  - To update a source, rerun its `add` command with a new commit.
+  - The skills ship their own TypeScript scripts and Bun tests. ESLint, Vitest, and `tsconfig.json` exclude `.agents/` and `.claude/`. Without that, `npm run lint` and `npm test` fail on vendored files.
+- **Verify.** It checks Node 24, then runs `npm ci`, `npm run lint`, `npm run build`, and `npm test`. Vitest exits non-zero when it finds no test files. It checks that `node_modules`, `.next`, and `next-env.d.ts` are ignored, and that `git status` shows nothing under them. Verify runs in the task repo that `publish` diffs, so an unignored build folder would land in the PR. It also checks that `skills-lock.json` holds exactly the 22 pinned skills at their commits, that skill files resolve through `.claude/skills`, and the contents of `AGENTS.md`, `CLAUDE.md`, and `package.json`.
+- **Checked before the run.** On the operator's Mac (Node 24.18.0, npm 11.16.0), the generate-and-copy scaffold passed all 14 verify commands from a clean `node_modules`. All three pinned skill installs worked, and a patch that adds the skill symlinks applied cleanly with `git apply --index`.
+
 ## Reuse
 
 - **`gh` and `aws` CLIs** instead of SDKs. This matches `watch-pr/github.ts`, which already shells out to `gh`.
@@ -74,6 +91,8 @@ The runtime is Node 24's built-in TypeScript type stripping with `node:test`, an
 | T11 | Codex review, docs, handoff | all |
 | T13 | Task `packages` and `setup`, `--volume-gb` | – |
 | T14 | Task user, IMDS block, patch-based publish, root-only script files | – |
+| T15 | Agent (Claude Code) proof on EC2 against the sandbox | T13, T14 |
+| T16 | Benchmark repo, worker token access, scaffold through the factory on EC2 | T15, token grant (user) |
 
 ## Out of scope
 

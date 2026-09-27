@@ -1,0 +1,33 @@
+{
+  "repo": "olibyte/agent-factory-benchmark",
+  "title": "Scaffold the Next.js app with pinned agent skills",
+  "body": "T16 scaffold from Factory v0: Next.js 16.3.6, TypeScript, App Router, Tailwind CSS, Node 24, Vitest smoke test, and pinned agent-toolkit, vercel-labs/agent-skills, and vercel/next.js skills. No product features yet.",
+  "packages": ["tar", "xz"],
+  "setup": [
+    "arch=\"$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')\" && mkdir -p ~/.local && curl -fsSL \"https://nodejs.org/dist/v24.18.0/node-v24.18.0-linux-$arch.tar.xz\" | tar -xJ -C ~/.local --strip-components=1",
+    "test \"$(command -v node)\" = \"$HOME/.local/bin/node\" && node --version && npm --version"
+  ],
+  "change": {
+    "kind": "agent",
+    "harness": "claude-code",
+    "prompt": "Scaffold this repository as a minimal Next.js app for the Agent Factory benchmark. This task is scaffolding only. Do not build task-tracker features, extra pages, data models, auth, persistence, API routes, CI workflows, Docker files, or env files, and do not create .agents/models.md.\n\nWork from the repository root and follow these steps in order. Use exactly the versions and commits given.\n\n1. create-next-app refuses a folder that already contains README.md, so generate in a temp dir and copy in before installing anything. This brings in create-next-app's .gitignore first:\n   gen=\"$(mktemp -d)\" && (cd \"$gen\" && NEXT_TELEMETRY_DISABLED=1 npx --yes create-next-app@16.3.6 app --ts --tailwind --eslint --app --no-src-dir --import-alias '@/*' --use-npm --agents-md --disable-git --skip-install --yes) && cp -a \"$gen/app/.\" .\n   Keep every .gitignore entry it generated.\n2. In package.json, set name to agent-factory-benchmark, add \"engines\": {\"node\": \">=24 <25\"}, and add the script \"test\": \"vitest run\". Add a .nvmrc file containing 24.\n3. Run npm install, then npm install -D @types/node@^24 vitest @vitejs/plugin-react jsdom @testing-library/react @testing-library/dom vite-tsconfig-paths. Read node_modules/next/dist/docs/01-app/02-guides/testing/vitest.md and follow it: add vitest.config.mts as shown there, and add one smoke test, __tests__/page.test.tsx, that renders app/page.tsx and asserts a level-1 heading.\n4. Replace the create-next-app demo home page in app/page.tsx with a minimal Tailwind placeholder: an h1 reading Agent Factory Benchmark and one sentence saying the product brief comes next. Set the metadata title in app/layout.tsx to Agent Factory Benchmark and the description to one plain sentence. Delete the demo SVGs in public/ that nothing references any more.\n5. Install the agent skills, pinned. Do not use @latest, -g, or --copy:\n   A='-a claude-code -a cursor -a codex -a antigravity -a antigravity-cli -y'\n   DO_NOT_TRACK=1 npx --yes skills@1.7.0 add https://github.com/olibyte/agent-toolkit/tree/3a69c94ae8a0b5990a1c13aeb0f8e978269f6756 $A\n   DO_NOT_TRACK=1 npx --yes skills@1.7.0 add https://github.com/vercel-labs/agent-skills/tree/063bee94c3f4df8453406c830b0a7df0f2860278 -s vercel-react-best-practices -s vercel-composition-patterns -s web-design-guidelines $A\n   DO_NOT_TRACK=1 npx --yes skills@1.7.0 add https://github.com/vercel/next.js/tree/a758ffcf501f6f1ddb03175bd1033508424c261e/skills $A\n   Keep .agents/skills/, the .claude/skills/ symlinks, and skills-lock.json. The skills ship their own scripts and Bun tests, which are not part of the app. Exclude .agents and .claude from ESLint (add .agents/** and .claude/** to globalIgnores in eslint.config.mjs), from Vitest (test.exclude: [...configDefaults.exclude, '.agents/**', '.claude/**'] in vitest.config.mts), and from TypeScript (the exclude list in tsconfig.json).\n6. Make AGENTS.md the agent-toolkit template from https://raw.githubusercontent.com/olibyte/agent-toolkit/3a69c94ae8a0b5990a1c13aeb0f8e978269f6756/templates/AGENTS.md, then a blank line, then the nextjs-agent-rules block that create-next-app generated, unchanged from BEGIN to END marker. CLAUDE.md must contain exactly the line @AGENTS.md.\n7. Replace README.md with a short README. Cover what this repo is: the benchmark app for Factory v0 in olibyte/agent-toolkit, a deliberately small task tracker whose product brief comes next. Cover the stack (Next.js 16.3.6, React, TypeScript, Tailwind CSS, Node 24, npm, Vitest) and the commands (npm ci, npm run dev, npm run lint, npm run build, npm test). Add an Agent skills section that lists the three pinned sources with their commits, and explains that updating a source means rerunning its skills add command with a new commit.\n8. Run every verify command listed below yourself and fix whatever fails before you finish.",
+    "escalationModel": "opus"
+  },
+  "verify": [
+    "node --version | grep -q '^v24\\.'",
+    "npm ci --no-audit --no-fund",
+    "npm run lint",
+    "NEXT_TELEMETRY_DISABLED=1 npm run build",
+    "npm test",
+    "git check-ignore -q node_modules && git check-ignore -q .next && git check-ignore -q next-env.d.ts",
+    "test -z \"$(git status --porcelain --untracked-files=all -- node_modules .next next-env.d.ts)\"",
+    "node -e 'const p = require(\"./package.json\"); const ok = p.name === \"agent-factory-benchmark\" && p.engines?.node === \">=24 <25\" && p.dependencies?.next === \"16.3.6\" && p.scripts?.test === \"vitest run\" && p.devDependencies?.vitest; process.exit(ok ? 0 : 1)'",
+    "grep -qx 24 .nvmrc",
+    "node -e 'const pins = { \"olibyte/agent-toolkit\": [\"3a69c94ae8a0b5990a1c13aeb0f8e978269f6756\", 15], \"vercel-labs/agent-skills\": [\"063bee94c3f4df8453406c830b0a7df0f2860278\", 3], \"vercel/next.js\": [\"a758ffcf501f6f1ddb03175bd1033508424c261e\", 4] }; const skills = Object.values(require(\"./skills-lock.json\").skills); const ok = skills.length === 22 && Object.entries(pins).every(([source, [ref, count]]) => skills.filter((s) => s.source === source && s.ref === ref).length === count); process.exit(ok ? 0 : 1)'",
+    "for s in handoff poteto-mode vercel-react-best-practices web-design-guidelines next-dev-loop; do test -L .claude/skills/$s && test -f .claude/skills/$s/SKILL.md && test -f .agents/skills/$s/SKILL.md || exit 1; done",
+    "grep -q 'BEGIN:nextjs-agent-rules' AGENTS.md && grep -q 'END:nextjs-agent-rules' AGENTS.md && grep -q '^## Models' AGENTS.md && grep -q '/handoff' AGENTS.md",
+    "test \"$(cat CLAUDE.md)\" = '@AGENTS.md'",
+    "test ! -e .github && test ! -e .agents/models.md"
+  ],
+  "autoMerge": false
+}

@@ -24,7 +24,7 @@ Make the factory safe and capable enough to build a real app. T13 (task toolchai
 
 ## Current work
 
-- None in progress.
+- T16, the first real-app task. The design is in `.factory/plan.md` under "First real app: benchmark scaffold (T16)", and the task is `.factory/tasks/benchmark-scaffold.task.json`. Run it with `node factory/cli.ts run .factory/tasks/benchmark-scaffold.task.json --worker ec2 --instance-type t3.medium`. It needs `olibyte/agent-factory-benchmark` to exist, with the worker token granted access to it.
 
 ## Important decisions
 
