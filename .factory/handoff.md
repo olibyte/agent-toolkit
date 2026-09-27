@@ -36,7 +36,12 @@ Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory.
 
 ## Current work
 
-- T20, the product brief. The design is in `.factory/plan.md` under "Benchmark product brief (T20)", and the task is `.factory/tasks/benchmark-product-brief.task.json`. Run it with `node factory/cli.ts run .factory/tasks/benchmark-product-brief.task.json --worker ec2`. It is done when the PR adds only `docs/product-brief.md` and the operator merges it.
+- T20, the product brief, is waiting for the operator's review. The design is in `.factory/plan.md` under "Benchmark product brief (T20)".
+  - Run `20260927-020435-a540` of `.factory/tasks/benchmark-product-brief.task.json` completed in about 3 minutes on a `t3.small`, with no escalation. All 4 verify commands passed, and they passed again on a clone of the PR branch.
+  - It opened olibyte/agent-factory-benchmark#3 with one commit, `docs/product-brief.md` (+84 lines, 1037 words). CI and GitGuardian passed. The instance is `terminated`, and no instances or volumes remain.
+  - The brief covers the six capabilities, 12 non-goals, 10 success criteria, 6 assumptions (priority is Low, Medium, and High; each project has one owner; deleting a project deletes its tasks), and 7 open questions.
+  - Review notes for the operator: Target users says everyone who can see a project can work in it, which conflicts with the single-owner assumption. Open questions 1 and 5 both ask about sharing. There are no questions about the auth method or data retention, which the architecture step will need to raise. Headings have no blank line after them.
+  - T20 is done when the operator merges #3, or asks for a revised run.
 
 ## Important decisions
 

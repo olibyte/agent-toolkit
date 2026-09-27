@@ -147,7 +147,8 @@
         "status": "in_progress",
         "dependsOn": [
           "T16"
-        ]
+        ],
+        "evidence": "run 20260927-020435-a540: Claude Code (sonnet) wrote docs/product-brief.md (1037 words) on a t3.small in about 3 minutes with no escalation; 4 verify commands passed (only change, headings, scope, deny list); olibyte/agent-factory-benchmark#3, CI passed; awaiting operator review"
       },
       {
         "id": "T17",
