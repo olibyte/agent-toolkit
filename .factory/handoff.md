@@ -13,7 +13,7 @@ Make the factory safe and capable enough to build a real app. T13 (task toolchai
 - T12: the AWS setup is done. Identity Center user `olibyte-admin` has AdministratorAccess on a dedicated `agent-factory` member account, through the SSO profile `agent-factory` (region `ap-southeast-2`). The Terraform in `factory/infra` is applied there: 7 resources, including a $20 monthly budget that alerts `ocben1+agent-factory@gmail.com`. The Terraform state is local to the operator's laptop and gitignored. The controller's name-based lookup finds the security group and instance profile.
 - T10, the EC2 proof: run `20260926-015512-9c63` completed in about 2m45s. It launched a `t3.small` in `ap-southeast-2` with no key pair, IMDSv2, and the egress-only security group. The worker installed git 2.50.1 and gh 2.97.0, cloned the sandbox, wrote `proofs/<run>.txt` on the EC2 host, and passed all three verify commands. It pushed `factory/20260926-015512-9c63` and opened olibyte/agent-factory-sandbox#3. The Slack webhook accepted all four events with 0 failures. AWS reports the instance `terminated`, and no factory instances remain.
 - T7 local proof against real GitHub: runs `20260925-070547-e6aa` and `20260925-070936-ba02` opened olibyte/agent-factory-sandbox#1 and #2. The sandbox is a private, disposable repo created for these proofs.
-- olibyte/agent-toolkit#4 was squash-merged to `main`, and its branch was deleted. The sandbox proof PRs (#1, #2, #3) were closed and their branches deleted. The sandbox now holds only `main`.
+- olibyte/agent-toolkit#4 was squash-merged to `main`, and its branch was deleted. The sandbox proof PRs (#1 to #5) were closed and their branches deleted. The sandbox now holds only `main`.
 - T13 and T14, merged in olibyte/agent-toolkit#6, with the design in `.factory/plan.md` under "Task setup and worker hardening":
   - Task specs take `packages` (dnf, as root, names validated) and `setup` (commands as the task user in the repo, at the end of `prepare`). `--volume-gb` (default 20) sets an encrypted gp3 root volume.
   - Task-defined commands run as `factory-task` through `setpriv`, with a clean environment. An nftables rule blocks that uid from IMDS, and `prepare` fails if the block is missing. Root never runs git in the task's repo: `publish` applies the task's patch to root's own clone. SSM phase scripts go to a `mktemp` file instead of a fixed `/tmp` path.
@@ -44,7 +44,7 @@ Make the factory safe and capable enough to build a real app. T13 (task toolchai
 
 ## Open PRs
 
-- olibyte/agent-factory-sandbox#5 (T15 proof). Close it and delete its branch, as with #1 to #4.
+- None.
 
 ## Next recommended action
 
