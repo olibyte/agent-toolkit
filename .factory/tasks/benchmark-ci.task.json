@@ -1,0 +1,30 @@
+{
+  "repo": "olibyte/agent-factory-benchmark",
+  "title": "Add a CI workflow for lint, build, and test",
+  "body": "T19 from Factory v0: one GitHub Actions workflow that runs npm ci, lint, build, and test on every pull request and on pushes to main. Actions are pinned to commit SHAs, and the job has read-only permissions.",
+  "packages": ["python3-pyyaml"],
+  "setup": [
+    "arch=\"$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')\" && mkdir -p ~/.local && curl -fsSL \"https://nodejs.org/dist/v24.18.0/node-v24.18.0-linux-$arch.tar.xz\" | tar -xJ -C ~/.local --strip-components=1",
+    "case \"$(uname -m)\" in x86_64) arch=amd64 sum=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8 ;; aarch64) arch=arm64 sum=325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6 ;; *) exit 1 ;; esac && dir=\"$(mktemp -d)\" && f=\"actionlint_1.7.12_linux_$arch.tar.gz\" && curl -fsSLo \"$dir/$f\" \"https://github.com/rhysd/actionlint/releases/download/v1.7.12/$f\" && (cd \"$dir\" && echo \"$sum  $f\" | sha256sum -c -) && mkdir -p ~/.local/bin && tar -xzf \"$dir/$f\" -C ~/.local/bin actionlint",
+    "node --version && actionlint -version && python3 -c 'import yaml'"
+  ],
+  "change": {
+    "kind": "agent",
+    "harness": "claude-code",
+    "prompt": "Add one GitHub Actions CI workflow to this Next.js repository. Create only .github/workflows/ci.yml. Do not change any other file, and do not add deploy steps, secrets, a matrix, caching beyond setup-node's npm cache, or other workflows.\n\nThe workflow must be exactly this shape:\n- name: CI\n- on: pull_request (no filters) and push to branches [main]\n- top-level permissions: contents: read\n- concurrency: group ci-${{ github.ref }}, cancel-in-progress: true\n- one job with id check, name \"Lint, build, and test\", runs-on ubuntu-24.04, timeout-minutes 15, and env NEXT_TELEMETRY_DISABLED: 1\n- steps, in this order:\n  1. uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, with persist-credentials: false\n  2. uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0, with node-version-file: .nvmrc and cache: npm\n  3. run: npm ci --no-audit --no-fund\n  4. run: npm run lint\n  5. run: npm run build\n  6. run: npm test\n\nKeep the version comments after each pinned SHA. Run actionlint .github/workflows/ci.yml, then run every verify command listed below yourself, and fix whatever fails before you finish.",
+    "escalationModel": "opus"
+  },
+  "verify": [
+    "test \"$(git status --porcelain --untracked-files=all)\" = '?? .github/workflows/ci.yml'",
+    "actionlint .github/workflows/ci.yml",
+    "grep -q 'uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1' .github/workflows/ci.yml && grep -q 'uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0' .github/workflows/ci.yml",
+    "! grep -E 'uses:' .github/workflows/ci.yml | grep -vE '@[0-9a-f]{40} # v[0-9]'",
+    "python3 -c 'import yaml; d = yaml.safe_load(open(\".github/workflows/ci.yml\")); on = d.get(\"on\", d.get(True)); j = d[\"jobs\"][\"check\"]; s = j[\"steps\"]; assert list(d[\"jobs\"]) == [\"check\"], \"jobs\"; assert set(on) == {\"pull_request\", \"push\"} and on[\"pull_request\"] is None and on[\"push\"] == {\"branches\": [\"main\"]}, \"triggers\"; assert d[\"permissions\"] == {\"contents\": \"read\"}, \"permissions\"; assert j[\"runs-on\"] == \"ubuntu-24.04\" and j[\"timeout-minutes\"] == 15, \"runner\"; assert s[0][\"uses\"].startswith(\"actions/checkout@\") and s[0][\"with\"] == {\"persist-credentials\": False}, \"checkout\"; assert s[1][\"uses\"].startswith(\"actions/setup-node@\") and s[1][\"with\"] == {\"node-version-file\": \".nvmrc\", \"cache\": \"npm\"}, \"setup-node\"; assert [x.get(\"run\") for x in s[2:]] == [\"npm ci --no-audit --no-fund\", \"npm run lint\", \"npm run build\", \"npm test\"], \"commands\"'",
+    "node --version | grep -q '^v24\\.'",
+    "npm ci --no-audit --no-fund",
+    "npm run lint",
+    "NEXT_TELEMETRY_DISABLED=1 npm run build",
+    "npm test"
+  ],
+  "autoMerge": false
+}

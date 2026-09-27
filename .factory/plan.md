@@ -65,6 +65,18 @@ The benchmark app is a deliberately small task tracker. It tests the factory wor
 - **Verify.** It checks Node 24, then runs `npm ci`, `npm run lint`, `npm run build`, and `npm test`. Vitest exits non-zero when it finds no test files. It checks that `node_modules`, `.next`, and `next-env.d.ts` are ignored, and that `git status` shows nothing under them. Verify runs in the task repo that `publish` diffs, so an unignored build folder would land in the PR. It also checks that `skills-lock.json` holds exactly the 22 pinned skills at their commits, that skill files resolve through `.claude/skills`, and the contents of `AGENTS.md`, `CLAUDE.md`, and `package.json`.
 - **Checked before the run.** On the operator's Mac (Node 24.18.0, npm 11.16.0), the generate-and-copy scaffold passed all 14 verify commands from a clean `node_modules`. All three pinned skill installs worked, and a patch that adds the skill symlinks applied cleanly with `git apply --index`.
 
+### Benchmark CI workflow (T19)
+
+The benchmark repo gets one GitHub Actions workflow. It runs on every PR and on every push to `main`, so later factory PRs get an independent check from GitHub as well as the worker's own verify.
+
+- **Workflow.** `.github/workflows/ci.yml`, named `CI`, with one job, `check`, on `ubuntu-24.04` with a 15-minute limit. The job runs the same four commands as the scaffold's verify: `npm ci --no-audit --no-fund`, `npm run lint`, `npm run build`, and `npm test`. `NEXT_TELEMETRY_DISABLED=1` is set. `permissions: contents: read`, and checkout uses `persist-credentials: false`. A concurrency group cancels superseded runs on the same ref. There is no deploy step, no secrets, no matrix, and no branch protection. Requiring the check before merge is a separate decision for the operator.
+- **Pins.** Actions are pinned to full commit SHAs, with the tag as a comment: `actions/checkout` v7.0.1 (`3d3c42e`) and `actions/setup-node` v7.0.0 (`8207627`). Node comes from `.nvmrc` (24), so CI and the worker use the same major version.
+- **Token.** Pushing a file under `.github/workflows/` needs the worker token's **Workflows: Read and write** permission. Only the operator can add it, in the GitHub web UI. GitHub rejects the push without it, so a missing grant shows up in `publish`.
+- **Task.** `.factory/tasks/benchmark-ci.task.json`, one run, one PR. It is a Claude Code agent task with an exact spec, like T16. `packages` adds `python3-pyyaml`. `setup` installs Node 24.18.0 and actionlint 1.7.12 into `~/.local`, and checks actionlint's release SHA-256 first.
+- **Verify.** It checks that the only change is `.github/workflows/ci.yml`, that actionlint passes, and that every `uses:` is a 40-character SHA with a version comment. A PyYAML assertion checks the triggers, the permissions, the checkout and setup-node settings, the four commands in order, and the time limit. Then it runs the same four commands on the worker.
+- **Real proof.** The PR that the run opens triggers the workflow itself, from a branch in the same repo. T19 is done when that check passes on the PR and again on `main` after the merge.
+- **Checked before the run.** The intended workflow passed actionlint 1.7.12 on the operator's Mac, and the verify list passed against a clone of the benchmark's `main`.
+
 ## Reuse
 
 - **`gh` and `aws` CLIs** instead of SDKs. This matches `watch-pr/github.ts`, which already shells out to `gh`.
@@ -93,6 +105,7 @@ The benchmark app is a deliberately small task tracker. It tests the factory wor
 | T14 | Task user, IMDS block, patch-based publish, root-only script files | – |
 | T15 | Agent (Claude Code) proof on EC2 against the sandbox | T13, T14 |
 | T16 | Benchmark repo, worker token access, scaffold through the factory on EC2 | T15, token grant (user) |
+| T19 | Benchmark CI workflow through the factory | T16, Workflows permission (user) |
 
 ## Out of scope
 
