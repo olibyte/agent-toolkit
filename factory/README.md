@@ -45,7 +45,7 @@ cd factory && npm install && npm run check   # tsc --noEmit plus node --test
 - Every task command receives `FACTORY_RUN_ID` and `FACTORY_BRANCH`. The branch is `factory/<run-id>`.
 - With `autoMerge: true`, the run calls `gh pr merge --auto --squash`. The repo must allow auto-merge. If it does not, the run logs a warning and still completes.
 
-Examples: [`examples/proof.task.json`](examples/proof.task.json), [`examples/agent.task.json`](examples/agent.task.json), and [`examples/toolchain.task.json`](examples/toolchain.task.json) (EC2 only).
+Examples: [`examples/proof.task.json`](examples/proof.task.json), [`examples/agent.task.json`](examples/agent.task.json) (its skills check passes locally only if `~/.claude/skills` has this toolkit's skills), and [`examples/toolchain.task.json`](examples/toolchain.task.json) (EC2 only).
 
 ## Run
 

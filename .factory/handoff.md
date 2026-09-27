@@ -4,7 +4,7 @@ Read this file, `.factory/plan.md`, and `.factory/state.json` (the task list) be
 
 ## Current goal
 
-Make the factory safe and capable enough to build a real app. T13 (task toolchain) and T14 (worker hardening) are merged (olibyte/agent-toolkit#6) and proven on EC2. Next is the agent proof (T15), which needs the user. The tasks are T13 to T18 in `.factory/state.json`.
+Make the factory safe and capable enough to build a real app. T13 (task toolchain) and T14 (worker hardening) are merged (olibyte/agent-toolkit#6) and proven on EC2. T15, the agent proof on EC2, is done. Next is the first real-app task (T16). The tasks are T13 to T18 in `.factory/state.json`.
 
 ## Completed work
 
@@ -19,6 +19,7 @@ Make the factory safe and capable enough to build a real app. T13 (task toolchai
   - Task-defined commands run as `factory-task` through `setpriv`, with a clean environment. An nftables rule blocks that uid from IMDS, and `prepare` fails if the block is missing. Root never runs git in the task's repo: `publish` applies the task's patch to root's own clone. SSM phase scripts go to a `mktemp` file instead of a fixed `/tmp` path.
   - Tests cover a hook planted in the task repo (it never runs), and a patch forged through `diff.external` that writes into `.git` (publish refuses it). A mutation that publishes from the task repo makes the hook test fail.
   - EC2 proof: run `20260926-024319-c00d` of `factory/examples/toolchain.task.json` completed in 2m12s on a `t3.small`. Task commands ran as `factory-task` (uid 1001). `curl` to IMDS failed and `aws sts get-caller-identity` found no credentials. Root was at least 19 GiB. Setup installed Python 3.12.14 from `packages` and Node v24.18.0 into `~/.local`. The run opened olibyte/agent-factory-sandbox#4 with one commit, which is now closed and its branch deleted. The instance is `terminated`, and its volume is gone.
+- T15, the agent proof on EC2: run `20260927-003729-9af5` of `factory/examples/agent.task.json` completed in about 2m40s on a `t3.small`, with no escalation. Claude Code (`sonnet`) ran as `factory-task` and added a `## Usage` section to the sandbox README. The auto-updater's failed global writes did not break the run. The task gained a second verify command, `test -f ~/.claude/skills/handoff/SKILL.md`, which passed as `factory-task`, so the skills install lands in `/home/factory-task/.claude`. The agent can see verify commands in its prompt, and it reported that the file already existed. The run opened olibyte/agent-factory-sandbox#5 with one commit (README.md +4). The instance is `terminated`, and no factory instances remain. The Anthropic API key is in `/agent-factory/anthropic-api-key`. Its spend limit is set in the Anthropic Console, because the AWS budget does not cover API spend.
 - Codex reviewed `factory/` read-only. Two findings were fixed: the GitHub token is now visible only in `prepare` and `publish`, and SIGINT cleanup waits for an in-flight launch. One finding was rejected: the `factory_secret` failure path never echoes the value.
 
 ## Current work
@@ -35,7 +36,7 @@ Make the factory safe and capable enough to build a real app. T13 (task toolchai
 - The user asked for Terraform, not CloudFormation, so `factory/infra/` replaced the CloudFormation template before anything was deployed. Resources have fixed names (`agent-factory-worker`, `/agent-factory/`), and the CLI finds the security group by name instead of reading Terraform state. State stays local and gitignored for now.
 - AWS access: a dedicated member account under IAM Identity Center, with the `agent-factory` SSO profile. `FACTORY_AWS_PROFILE` scopes that profile to factory commands only, so other tools keep their own AWS settings. No root keys.
 - Root runs only controller-rendered steps. Everything the task defines runs as `factory-task`, which is blocked from IMDS. Data crosses from the task user to root only as stdout of a process that runs as the task user (the blocked signal and the patch). Root treats that data as untrusted, and `git apply` refuses `.git/`, `..`, and writes through symlinks.
-- Remaining limits: the task user has open network egress and holds the agent API key during `change`. The agent path under the task user has passed `bash -n` and tests only. Nobody has run it on EC2 yet (T15). The local worker runs everything as the operator, with no isolation.
+- Remaining limits: the task user has open network egress and holds the agent API key during `change`. Only the Claude Code agent path has run on EC2 (T15). The Codex path has passed `bash -n` and tests only. The local worker runs everything as the operator, with no isolation.
 
 ## Blockers
 
@@ -43,12 +44,11 @@ Make the factory safe and capable enough to build a real app. T13 (task toolchai
 
 ## Open PRs
 
-- None.
+- olibyte/agent-factory-sandbox#5 (T15 proof). Close it and delete its branch, as with #1 to #4.
 
 ## Next recommended action
 
-1. T15, which needs the user: store `/agent-factory/anthropic-api-key` in SSM and set an Anthropic console spend limit (the AWS budget does not cover API spend). Then run `factory/examples/agent.task.json` on EC2 against the sandbox. This is the first run of Claude Code as `factory-task`. Check that the skills install lands in `/home/factory-task/.claude` and that the auto-updater's failed global writes do not break the run.
-2. T16: create the real app's repo, add it to the worker's fine-grained GitHub token, and run the first task (scaffold) through the factory. There is one PR per task.
-3. Later: T17 moves Terraform state to an S3 backend once a second machine or person applies. T18 builds the task tracker, informed by the first real-app tasks.
+1. T16: create the real app's repo, add it to the worker's fine-grained GitHub token, and run the first task (scaffold) through the factory. There is one PR per task.
+2. Later: T17 moves Terraform state to an S3 backend once a second machine or person applies. T18 builds the task tracker, informed by the first real-app tasks.
 
 Follow the original working method. Record a short design for each new task in `.factory/plan.md` before building it, keep interfaces small, and verify against real systems.

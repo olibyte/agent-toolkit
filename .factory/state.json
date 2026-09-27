@@ -116,12 +116,12 @@
       {
         "id": "T15",
         "title": "Prove an agent task on EC2 against the sandbox",
-        "status": "blocked",
+        "status": "done",
         "dependsOn": [
           "T13",
           "T14"
         ],
-        "blockedOn": "user: /agent-factory/anthropic-api-key in SSM, Anthropic spend limit"
+        "evidence": "run 20260927-003729-9af5: Claude Code (sonnet) ran as factory-task on EC2 and passed on the first attempt; verify found ~/.claude/skills/handoff/SKILL.md; olibyte/agent-factory-sandbox#5"
       },
       {
         "id": "T16",

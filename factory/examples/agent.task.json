@@ -7,5 +7,5 @@
     "prompt": "Add a short 'Usage' section to README.md explaining that this repository receives Factory proof runs.",
     "escalationModel": "opus"
   },
-  "verify": ["grep -q '^## Usage' README.md"]
+  "verify": ["grep -q '^## Usage' README.md", "test -f ~/.claude/skills/handoff/SKILL.md"]
 }
