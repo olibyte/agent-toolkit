@@ -4,7 +4,7 @@ Read this file, `.factory/plan.md`, and `.factory/state.json` (the task list) be
 
 ## Current goal
 
-Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory. It is a deliberately small task tracker that tests the factory workflow, not application complexity. T16 (the scaffold), T19 (CI), and T20 (the product brief) are done. The planning phase starts from the operator's short product intent, which is recorded in `.factory/plan.md` under "Benchmark product brief (T20)". The factory generated `docs/product-brief.md` from it (T20). Next come the requirements, architecture, data model, API, and security decisions, acceptance tests, a dependency-aware task graph, Human Gate #1, then parallel implementation. The tasks are in `.factory/state.json`.
+Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory. It is a deliberately small task tracker that tests the factory workflow, not application complexity. T16 (the scaffold), T19 (CI), and T20 (the product brief) are done. T21 (the requirements) is waiting for review in olibyte/agent-factory-benchmark#4. The planning phase starts from the operator's short product intent, which is recorded in `.factory/plan.md` under "Benchmark product brief (T20)". The factory generated `docs/product-brief.md` from it (T20), and `docs/requirements.md` from the brief (T21). Next come the architecture, data model, API, and security decisions, acceptance tests, a dependency-aware task graph, Human Gate #1, then parallel implementation. The tasks are in `.factory/state.json`.
 
 ## Completed work
 
@@ -38,11 +38,17 @@ Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory.
   - The brief covers the six capabilities, 12 non-goals, 10 success criteria, 6 assumptions (priority is Low, Medium, and High; each project has one owner; deleting a project deletes its tasks), and 7 open questions.
   - The operator reviewed and merged it (`3bf00ec`), and CI passed on `main`. Notes from the review, not fixed: Target users says everyone who can see a project can work in it, which conflicts with the single-owner assumption. Open questions 1 and 5 both ask about sharing. There are no questions about the auth method or data retention, which the architecture step will need to raise. Headings have no blank line after them.
   - The run branch is deleted.
+- T21, the requirements, with the design in `.factory/plan.md` under "Benchmark requirements (T21)":
+  - Before the run, a sample document passed all 5 verify commands, and 11 mutations each failed only the command meant to catch them.
+  - Run `20260927-022835-9bea` of `.factory/tasks/benchmark-requirements.task.json` completed in about 5 minutes on a `t3.small`, with no escalation. All 5 verify commands passed, and they passed again on a clone of the PR branch.
+  - It opened olibyte/agent-factory-benchmark#4 with one commit, `docs/requirements.md` (+99 lines, 1440 words). CI and GitGuardian passed. The instance is `terminated`, and no instances or volumes remain.
+  - The document has 30 functional requirements (the maximum allowed), 6 non-functional ones, a traceability table that covers all 10 of the brief's success criteria, 4 assumptions, and 6 open questions. It follows the single-owner assumption and leaves renaming and deleting projects out of scope.
+  - Notes for review: some requirements overlap (FR-02 and FR-05, FR-12 and FR-13, and status and priority each have a "reflected immediately" requirement). There is no sign-out requirement and no length limit on descriptions. The task list's order is an assumption, not a requirement. FR-09 creates every task as Medium, so the user can't choose a priority when creating a task. The open question about deleting projects cites FR-08, an empty-state requirement, because no requirement covers project deletion. The agent said "all four" checks passed when there are five, but the worker's verify log shows all five ran and passed.
 - Codex reviewed `factory/` read-only. Two findings were fixed: the GitHub token is now visible only in `prepare` and `publish`, and SIGINT cleanup waits for an in-flight launch. One finding was rejected: the `factory_secret` failure path never echoes the value.
 
 ## Current work
 
-- None in progress.
+- T21 is waiting for the operator to review and merge olibyte/agent-factory-benchmark#4.
 
 ## Important decisions
 
@@ -64,11 +70,11 @@ Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory.
 
 ## Open PRs
 
-- None.
+- olibyte/agent-factory-benchmark#4: the T21 requirements, from run `20260927-022835-9bea`.
 
 ## Next recommended action
 
-1. Generate the requirements from `docs/product-brief.md` through the factory, then the rest of the planning steps up to Human Gate #1. Design each step in `.factory/plan.md` before running it. Where the brief conflicts with itself, the requirements follow its Assumptions (for example, single-owner projects), and the open questions stay open for Human Gate #1.
+1. After olibyte/agent-factory-benchmark#4 merges, generate the architecture from `docs/product-brief.md` and `docs/requirements.md` through the factory, then the rest of the planning steps up to Human Gate #1. Design each step in `.factory/plan.md` before running it. Later documents cite requirements by their FR and NFR IDs, and the open questions stay open for Human Gate #1.
 2. Small follow-ups for the benchmark repo, each as its own factory task: dropping `vite-tsconfig-paths` for Vite's built-in `resolve.tsconfigPaths`, which Vitest suggests; and a decision on npm's `allow-scripts` warning for `unrs-resolver`.
 3. Later: T17 moves Terraform state to an S3 backend once a second machine or person applies. T18 builds the task tracker, informed by the first real-app tasks.
 

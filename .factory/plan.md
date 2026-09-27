@@ -90,6 +90,18 @@ The planning phase starts from a short product intent, not a formal brief writte
 - **Verify.** Four commands. The only change is `docs/product-brief.md`. The title and the nine `##` headings match exactly and in order, the length is 500 to 1400 words, and there are no placeholders or emoji. Scope names the three statuses exactly, plus projects, create, edit, delete, priority, filters, and the dashboard, and no assignees, due dates, attachments, or notifications. The Summary names Factory v0 and agent-toolkit, the brief covers sign-in, Success criteria has at least 5 bullets, Assumptions has at least 3, and Open questions has 3 to 8 bullets that all end with `?`. A deny list rejects named databases, auth providers and protocols, clouds, and hosting platforms. The quality of the writing is for the operator to judge in the PR.
 - **Checked before the run.** Against a clone of the benchmark's `main`, a sample brief passed all four commands. Seven mutations each failed the command meant to catch them: an extra changed file, a renamed heading, a placeholder, different status names, an assignee in Scope, a named database, and a question without `?`.
 
+### Benchmark requirements (T21)
+
+The second planning step turns `docs/product-brief.md` into `docs/requirements.md` in the benchmark repo. Later steps cite requirements by ID: the acceptance tests check them, and the task graph splits them into build tasks. So the IDs and their format are the interface, and the verify commands check them strictly.
+
+- **Source.** The merged brief only, with no wider scope. Where the brief conflicts with itself, the Assumptions win. Its Target users mentions a small team, but its Assumptions make each project belong to one user with one kind of account, so the requirements are single-owner. The brief's Scope creates, lists, and opens projects but never renames or deletes them, so those go under Out of scope. The brief's cascade assumption applies if project deletion is added later.
+- **Format.** Each requirement is a one-line bullet, `- **FR-01** ...` or `- **NFR-01** ...`, numbered in order with no gaps, and each says what the app must do in a way an automated test could check. There are 12 to 30 functional requirements, grouped under Access, Projects, Tasks, Status and priority, Filtering, and Dashboard. There are 4 to 10 non-functional ones: access control, input validation, accessibility, error and empty states, and testability. A Traceability table maps each of the brief's success criteria (`SC-1` onwards, in order) to the requirements that satisfy it.
+- **Open details.** Where a requirement needs something the brief leaves open, such as length limits, list order, or empty states, the agent picks the simplest option, writes it into the requirement, and lists it under Assumptions. The open questions carry over the brief's questions that are still open, merge its two sharing questions, and add sign-in method and account deletion. Each question names the requirement IDs its answer would change.
+- **Boundaries.** Same as the brief: no database, ORM, auth library or protocol, hosting platform, or cloud service. The sign-in method is left to the security decisions step, so passwords, passkeys, magic links, SSO, and MFA are not named either.
+- **Task.** `.factory/tasks/benchmark-requirements.task.json`, one run, one PR, on a `t3.small`. Claude Code runs on `sonnet` with an `opus` retry, and needs no `packages` or `setup`.
+- **Verify.** Five commands. The only change is `docs/requirements.md`. The headings match exactly and in order, with a blank line after each one, and there are 800 to 2400 words with no placeholders or emoji. IDs are sequential and in range, every bullet in the two requirement sections is a requirement that says "must", and every ID the document cites exists. The Traceability table has one row per bullet in the brief's Success criteria, read from the brief itself, and each row names a requirement. The functional requirements name the three statuses, the three priorities, and sign-in, and nothing from the brief's Non-goals. There are at least 2 assumptions, and 3 to 8 open questions that each cite an ID and end with `?`. A deny list covers the brief's list plus sign-in methods.
+- **Checked before the run.** Against a clone of the benchmark's `main`, a sample document (1095 words) passed all five commands. Eleven mutations each failed only the command meant to catch them: an extra file, an edited brief, a missing blank line, an ID gap, a requirement without "must", a stray bullet, an unknown ID, a missing traceability row, an assignee in the requirements, a question without an ID, and a named sign-in method.
+
 ## Reuse
 
 - **`gh` and `aws` CLIs** instead of SDKs. This matches `watch-pr/github.ts`, which already shells out to `gh`.
@@ -120,6 +132,7 @@ The planning phase starts from a short product intent, not a formal brief writte
 | T16 | Benchmark repo, worker token access, scaffold through the factory on EC2 | T15, token grant (user) |
 | T19 | Benchmark CI workflow through the factory | T16, Workflows permission (user) |
 | T20 | Benchmark product brief from the product intent, through the factory | T16 |
+| T21 | Benchmark requirements from the product brief, through the factory | T20 |
 
 ## Out of scope
 
