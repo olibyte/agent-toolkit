@@ -102,6 +102,21 @@ The second planning step turns `docs/product-brief.md` into `docs/requirements.m
 - **Verify.** Five commands. The only change is `docs/requirements.md`. The headings match exactly and in order, with a blank line after each one, and there are 800 to 2400 words with no placeholders or emoji. IDs are sequential and in range, every bullet in the two requirement sections is a requirement that says "must", and every ID the document cites exists. The Traceability table has one row per bullet in the brief's Success criteria, read from the brief itself, and each row names a requirement. The functional requirements name the three statuses, the three priorities, and sign-in, and nothing from the brief's Non-goals. There are at least 2 assumptions, and 3 to 8 open questions that each cite an ID and end with `?`. A deny list covers the brief's list plus sign-in methods.
 - **Checked before the run.** Against a clone of the benchmark's `main`, a sample document (1095 words) passed all five commands. Eleven mutations each failed only the command meant to catch them: an extra file, an edited brief, a missing blank line, an ID gap, a requirement without "must", a stray bullet, an unknown ID, a missing traceability row, an assignee in the requirements, a question without an ID, and a named sign-in method.
 
+### Benchmark requirements with the operator's answers (T22)
+
+The operator answered T21's open questions on 2026-09-27, before merging it. They also set a rule of thumb for later product questions: use Trello, or a very basic, dialled-down Jira, as the north star.
+
+- **Answers.** Projects are shared. When project deletion is added, the app warns the user first. Three priority levels are enough. Project names need not be unique. A sign-up flow is required. The sign-in method is the factory's call for an MVP. A signed-in user can delete their own account.
+- **Calls made from those answers** (Trello-like, as small as possible):
+  - Accounts use an email address and a password. The email is unique regardless of case, the password is at least 8 characters, and sign-up signs the user in. There is no email verification and no password reset, because both need email delivery. Sign-in failures say only that the email or password is wrong.
+  - Sharing: whoever creates a project owns it. The owner adds members by the email of an existing account and can remove them. Members can do everything with tasks, but only the owner manages members. Owner and member are the only roles. There are no invitations to people without an account, no leaving, and no ownership transfer.
+  - Deleting an account needs the password. It removes the user from other people's projects and deletes the projects they own, with those projects' tasks, after a warning that names them. Project deletion itself stays out of v1.
+  - Priority can be chosen when a task is created, and defaults to Medium.
+- **Where the answers live.** In a new `## Decisions` section of `docs/requirements.md`, which also records the north star. The brief keeps its original assumptions, and the Overview says the Decisions override the brief where they differ. Later factory tasks clone only the benchmark repo, so the rule must be written there to reach them.
+- **Task.** `.factory/tasks/benchmark-requirements-decisions.task.json`. `main` doesn't have the T21 draft yet, so `setup` downloads it from #4's head commit (`921dd4b`) into the working tree, and the agent revises it in place. The run opens one PR that replaces #4. The agent also fixes the review notes: overlapping requirements, sign-out, a description length limit, the task-list order, and the stray citation. IDs are renumbered, because nothing cites them yet.
+- **Verify.** Still five commands, adjusted from T21. The headings add Decisions. There are 1000 to 3000 words and 20 to 40 functional requirements. The functional requirements must cover sign-up, sign-in, sign-out, account deletion, and members. Decisions has at least 7 bullets, each citing an ID, and names the north star. Open questions shrink to 0 to 5. The deny list no longer blocks "password", but still blocks every other sign-in method, provider, and library.
+- **Checked before the run.** On a clean clone of `main`, `setup` downloaded the draft (99 lines), and the unrevised draft failed the headings and sign-up checks as it should. A revised sample (1350 words, 28 functional requirements) passed all five commands. Ten mutations each failed: no Decisions section, a decision with no ID, no north star, no sign-up, no account deletion, no sign-out, a hashing algorithm named, another sign-in method named, 6 open questions, and 19 functional requirements. The first sample showed that the Decisions check required "sign in" spelled exactly, so it now accepts "sign-in" too.
+
 ## Reuse
 
 - **`gh` and `aws` CLIs** instead of SDKs. This matches `watch-pr/github.ts`, which already shells out to `gh`.
@@ -133,6 +148,7 @@ The second planning step turns `docs/product-brief.md` into `docs/requirements.m
 | T19 | Benchmark CI workflow through the factory | T16, Workflows permission (user) |
 | T20 | Benchmark product brief from the product intent, through the factory | T16 |
 | T21 | Benchmark requirements from the product brief, through the factory | T20 |
+| T22 | Benchmark requirements revised with the operator's answers, through the factory | T21 |
 
 ## Out of scope
 

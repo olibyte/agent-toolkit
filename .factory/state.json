@@ -157,7 +157,16 @@
         "dependsOn": [
           "T20"
         ],
-        "evidence": "run 20260927-022835-9bea: Claude Code (sonnet) wrote docs/requirements.md (30 FRs, 6 NFRs, 1440 words) on a t3.small in about 5 minutes with no escalation; 5 verify commands passed (only change, headings, IDs, traceability and scope, deny list); olibyte/agent-factory-benchmark#4; CI passed on the PR"
+        "evidence": "run 20260927-022835-9bea: Claude Code (sonnet) wrote docs/requirements.md (30 FRs, 6 NFRs, 1440 words) on a t3.small in about 5 minutes with no escalation; 5 verify commands passed (only change, headings, IDs, traceability and scope, deny list); olibyte/agent-factory-benchmark#4, closed as replaced by #5 after the operator answered its open questions"
+      },
+      {
+        "id": "T22",
+        "title": "Benchmark requirements revised with the operator's answers, through the factory",
+        "status": "done",
+        "dependsOn": [
+          "T21"
+        ],
+        "evidence": "run 20260927-024402-2f06: setup downloaded the T21 draft from #4 at 921dd4b, and Claude Code (sonnet) revised it with the operator's decisions (40 FRs, 6 NFRs, 2069 words) on a t3.small in about 6.5 minutes with no escalation; 5 verify commands passed; olibyte/agent-factory-benchmark#5; CI passed on the PR"
       },
       {
         "id": "T17",

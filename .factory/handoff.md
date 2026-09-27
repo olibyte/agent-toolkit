@@ -4,7 +4,7 @@ Read this file, `.factory/plan.md`, and `.factory/state.json` (the task list) be
 
 ## Current goal
 
-Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory. It is a deliberately small task tracker that tests the factory workflow, not application complexity. T16 (the scaffold), T19 (CI), and T20 (the product brief) are done. T21 (the requirements) is waiting for review in olibyte/agent-factory-benchmark#4. The planning phase starts from the operator's short product intent, which is recorded in `.factory/plan.md` under "Benchmark product brief (T20)". The factory generated `docs/product-brief.md` from it (T20), and `docs/requirements.md` from the brief (T21). Next come the architecture, data model, API, and security decisions, acceptance tests, a dependency-aware task graph, Human Gate #1, then parallel implementation. The tasks are in `.factory/state.json`.
+Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory. It is a deliberately small task tracker that tests the factory workflow, not application complexity. T16 (the scaffold), T19 (CI), and T20 (the product brief) are done. T21 drafted the requirements, and T22 revised them with the operator's answers. The revision is waiting for review in olibyte/agent-factory-benchmark#5. The planning phase starts from the operator's short product intent, which is recorded in `.factory/plan.md` under "Benchmark product brief (T20)". The factory generated `docs/product-brief.md` from it (T20), and `docs/requirements.md` from the brief (T21, revised in T22). Next come the architecture, data model, API, and security decisions, acceptance tests, a dependency-aware task graph, Human Gate #1, then parallel implementation. The tasks are in `.factory/state.json`.
 
 ## Completed work
 
@@ -43,12 +43,20 @@ Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory.
   - Run `20260927-022835-9bea` of `.factory/tasks/benchmark-requirements.task.json` completed in about 5 minutes on a `t3.small`, with no escalation. All 5 verify commands passed, and they passed again on a clone of the PR branch.
   - It opened olibyte/agent-factory-benchmark#4 with one commit, `docs/requirements.md` (+99 lines, 1440 words). CI and GitGuardian passed. The instance is `terminated`, and no instances or volumes remain.
   - The document has 30 functional requirements (the maximum allowed), 6 non-functional ones, a traceability table that covers all 10 of the brief's success criteria, 4 assumptions, and 6 open questions. It follows the single-owner assumption and leaves renaming and deleting projects out of scope.
-  - Notes for review: some requirements overlap (FR-02 and FR-05, FR-12 and FR-13, and status and priority each have a "reflected immediately" requirement). There is no sign-out requirement and no length limit on descriptions. The task list's order is an assumption, not a requirement. FR-09 creates every task as Medium, so the user can't choose a priority when creating a task. The open question about deleting projects cites FR-08, an empty-state requirement, because no requirement covers project deletion. The agent said "all four" checks passed when there are five, but the worker's verify log shows all five ran and passed.
+  - The operator answered its open questions instead of merging it. T22 revised the draft, and #4 was closed as replaced by #5, and its branch deleted.
+  - Notes from the review, which T22 fixed: some requirements overlap (FR-02 and FR-05, FR-12 and FR-13, and status and priority each have a "reflected immediately" requirement). There is no sign-out requirement and no length limit on descriptions. The task list's order is an assumption, not a requirement. FR-09 creates every task as Medium, so the user can't choose a priority when creating a task. The open question about deleting projects cites FR-08, an empty-state requirement, because no requirement covers project deletion. The agent said "all four" checks passed when there are five, but the worker's verify log shows all five ran and passed.
+- T22, the requirements revised with the operator's answers, with the design in `.factory/plan.md` under "Benchmark requirements with the operator's answers (T22)":
+  - The answers: projects are shared. When project deletion is added, the app warns first. Three priorities are enough. Names need not be unique. Sign-up is required. The sign-in method is the factory's call. Users can delete their own account. The north star for later product questions is Trello, or a very basic Jira.
+  - `setup` downloaded the T21 draft from #4's head commit, because `main` didn't have it, and the agent revised it in place. Before the run, the unrevised draft failed the new checks, a revised sample passed, and 10 mutations each failed.
+  - Run `20260927-024402-2f06` completed in about 6.5 minutes on a `t3.small`, with no escalation. All 5 verify commands passed, and they passed again on a clone of the PR branch.
+  - It opened olibyte/agent-factory-benchmark#5 with one commit, `docs/requirements.md` (+123 lines, 2069 words). CI and GitGuardian passed. The instance is `terminated`, and no instances or volumes remain.
+  - The document now has a Decisions section, 40 functional requirements (the maximum allowed; T21 had 30) under Accounts, Access, Projects, Sharing, Tasks, Status and priority, Filtering, and Dashboard, 6 non-functional requirements, 4 assumptions, and 3 open questions.
+  - Notes for review: it doesn't say what happens when an owner adds an email that has no account, or adds someone who is already a member. The project list's order is an assumption, while the task list's order is a requirement. FR-21 says other members see changes on their next page load, and FR-30 and FR-32 say the list shows a change "immediately". Both hold, because FR-30 and FR-32 mean the user who made the change, but the wording could be clearer. The Trello north star already answers two of the open questions: members can see the member list, and there is no member limit.
 - Codex reviewed `factory/` read-only. Two findings were fixed: the GitHub token is now visible only in `prepare` and `publish`, and SIGINT cleanup waits for an in-flight launch. One finding was rejected: the `factory_secret` failure path never echoes the value.
 
 ## Current work
 
-- T21 is waiting for the operator to review and merge olibyte/agent-factory-benchmark#4.
+- T22 is waiting for the operator to review and merge olibyte/agent-factory-benchmark#5.
 
 ## Important decisions
 
@@ -64,17 +72,19 @@ Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory.
 - Real-app task files live in `.factory/tasks/`, in agent-toolkit. The app repo holds no factory code. App skills are pinned per source to a commit through GitHub tree URLs with `skills@1.7.0`. Use a `t3.medium` or larger for Next.js builds.
 - Remaining limits: the task user has open network egress and holds the agent API key during `change`. Only the Claude Code agent path has run on EC2 (T15). The Codex path has passed `bash -n` and tests only. The local worker runs everything as the operator, with no isolation.
 
+- Product decisions (operator, 2026-09-27): projects are shared between an owner and members. Accounts use an email address and a password, with sign-up, sign-out, and account deletion. For later product questions, use Trello, or a very basic, dialled-down Jira, as the north star, and answer from it without asking the operator unless it changes scope. `docs/requirements.md` records these decisions, so factory tasks see them too.
+
 ## Blockers
 
 - None.
 
 ## Open PRs
 
-- olibyte/agent-factory-benchmark#4: the T21 requirements, from run `20260927-022835-9bea`.
+- olibyte/agent-factory-benchmark#5: the T22 requirements, from run `20260927-024402-2f06`. It replaces #4, which is closed.
 
 ## Next recommended action
 
-1. After olibyte/agent-factory-benchmark#4 merges, generate the architecture from `docs/product-brief.md` and `docs/requirements.md` through the factory, then the rest of the planning steps up to Human Gate #1. Design each step in `.factory/plan.md` before running it. Later documents cite requirements by their FR and NFR IDs, and the open questions stay open for Human Gate #1.
+1. After olibyte/agent-factory-benchmark#5 merges, generate the architecture from `docs/product-brief.md` and `docs/requirements.md` through the factory, then the rest of the planning steps up to Human Gate #1. Design each step in `.factory/plan.md` before running it. Later documents cite requirements by their FR and NFR IDs, and the open questions stay open for Human Gate #1.
 2. Small follow-ups for the benchmark repo, each as its own factory task: dropping `vite-tsconfig-paths` for Vite's built-in `resolve.tsconfigPaths`, which Vitest suggests; and a decision on npm's `allow-scripts` warning for `unrs-resolver`.
 3. Later: T17 moves Terraform state to an S3 backend once a second machine or person applies. T18 builds the task tracker, informed by the first real-app tasks.
 
