@@ -77,6 +77,19 @@ The benchmark repo gets one GitHub Actions workflow. It runs on every PR and on 
 - **Real proof.** The PR that the run opens triggers the workflow itself, from a branch in the same repo. T19 is done when that check passes on the PR and again on `main` after the merge.
 - **Checked before the run.** The intended workflow passed actionlint 1.7.12 on the operator's Mac, and the verify list passed against a clone of the benchmark's `main`.
 
+### Benchmark product brief (T20)
+
+The planning phase starts from a short product intent, not a formal brief written by the operator. The factory expands the intent into `docs/product-brief.md` in the benchmark repo. The next planning steps (requirements, architecture, data model, API and security decisions, acceptance tests, the task graph) build on that file, and Human Gate #1 answers its open questions.
+
+- **Product intent.** This is the operator's intent, given with T16. It is the committed source, and the task prompt carries a copy of it, because the worker clones only the benchmark repo:
+  > A deliberately small task/issue tracker. The product is intentionally simple because the main thing being tested is the autonomous software-factory workflow, not application complexity. The eventual application should allow an authenticated user to: create projects; create, edit and delete tasks; give tasks a status: Todo, In Progress, Done; assign a priority; filter tasks by status and priority; see a small dashboard/summary. Target user: an individual or small team managing simple software/project tasks.
+- **Where planning docs live.** In the benchmark repo under `docs/`, one file per planning step, each through its own factory task and PR. They describe the app, so they version with it. The factory's own coordination stays in agent-toolkit.
+- **Open details.** The intent leaves some product details open: priority levels, team sharing, what the dashboard shows, and what deleting a project does. None of them blocks the brief. The agent picks the simplest option, writes it under Assumptions, and lists the ones that change scope under Open questions for Human Gate #1. The operator is only asked earlier if a gap stops the brief being written at all.
+- **Boundaries.** The brief says what the product does and for whom. It names no database, ORM, auth library or protocol, hosting platform, or cloud service. Those decisions become open questions. It mentions the fixed scaffold stack once, under Constraints. v1 scope is the six capabilities in the intent, and everything else goes under Non-goals.
+- **Task.** `.factory/tasks/benchmark-product-brief.task.json`, one run, one PR. It is a Claude Code agent task (`sonnet`, with an `opus` retry). It needs no `packages` or `setup`, because it writes one Markdown file and the checks use the worker's `python3`. A `t3.small` is enough, because nothing is built.
+- **Verify.** Four commands. The only change is `docs/product-brief.md`. The title and the nine `##` headings match exactly and in order, the length is 500 to 1400 words, and there are no placeholders or emoji. Scope names the three statuses exactly, plus projects, create, edit, delete, priority, filters, and the dashboard, and no assignees, due dates, attachments, or notifications. The Summary names Factory v0 and agent-toolkit, the brief covers sign-in, Success criteria has at least 5 bullets, Assumptions has at least 3, and Open questions has 3 to 8 bullets that all end with `?`. A deny list rejects named databases, auth providers and protocols, clouds, and hosting platforms. The quality of the writing is for the operator to judge in the PR.
+- **Checked before the run.** Against a clone of the benchmark's `main`, a sample brief passed all four commands. Seven mutations each failed the command meant to catch them: an extra changed file, a renamed heading, a placeholder, different status names, an assignee in Scope, a named database, and a question without `?`.
+
 ## Reuse
 
 - **`gh` and `aws` CLIs** instead of SDKs. This matches `watch-pr/github.ts`, which already shells out to `gh`.
@@ -106,6 +119,7 @@ The benchmark repo gets one GitHub Actions workflow. It runs on every PR and on 
 | T15 | Agent (Claude Code) proof on EC2 against the sandbox | T13, T14 |
 | T16 | Benchmark repo, worker token access, scaffold through the factory on EC2 | T15, token grant (user) |
 | T19 | Benchmark CI workflow through the factory | T16, Workflows permission (user) |
+| T20 | Benchmark product brief from the product intent, through the factory | T16 |
 
 ## Out of scope
 

@@ -4,7 +4,7 @@ Read this file, `.factory/plan.md`, and `.factory/state.json` (the task list) be
 
 ## Current goal
 
-Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory. It is a deliberately small task tracker that tests the factory workflow, not application complexity. T16 (the scaffold) and T19 (CI) are done. Next is the planning phase: product brief, factory-generated requirements, architecture, data model, API, and security decisions, acceptance tests, a dependency-aware task graph, Human Gate #1, then parallel implementation. The tasks are in `.factory/state.json`.
+Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory. It is a deliberately small task tracker that tests the factory workflow, not application complexity. T16 (the scaffold) and T19 (CI) are done. The planning phase starts from the operator's short product intent, which is recorded in `.factory/plan.md` under "Benchmark product brief (T20)". The factory generates the product brief from it (T20), then the requirements, architecture, data model, API, and security decisions, acceptance tests, a dependency-aware task graph, Human Gate #1, then parallel implementation. The tasks are in `.factory/state.json`.
 
 ## Completed work
 
@@ -36,7 +36,7 @@ Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory.
 
 ## Current work
 
-- None in progress.
+- T20, the product brief. The design is in `.factory/plan.md` under "Benchmark product brief (T20)", and the task is `.factory/tasks/benchmark-product-brief.task.json`. Run it with `node factory/cli.ts run .factory/tasks/benchmark-product-brief.task.json --worker ec2`. It is done when the PR adds only `docs/product-brief.md` and the operator merges it.
 
 ## Important decisions
 
@@ -62,7 +62,7 @@ Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory.
 
 ## Next recommended action
 
-1. Start the planning phase with the operator's `product-brief.md`. Design how the factory turns it into requirements and a task graph before running any product task.
+1. After T20, generate the requirements from `docs/product-brief.md` through the factory, then the rest of the planning steps up to Human Gate #1. Design each step in `.factory/plan.md` before running it.
 2. Small follow-ups for the benchmark repo, each as its own factory task: dropping `vite-tsconfig-paths` for Vite's built-in `resolve.tsconfigPaths`, which Vitest suggests; and a decision on npm's `allow-scripts` warning for `unrs-resolver`.
 3. Later: T17 moves Terraform state to an S3 backend once a second machine or person applies. T18 builds the task tracker, informed by the first real-app tasks.
 
