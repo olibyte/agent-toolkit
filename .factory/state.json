@@ -133,6 +133,14 @@
         "evidence": "run 20260927-011023-06e6: Claude Code (sonnet) scaffolded Next.js 16.3.6 on a t3.medium in about 7.5 minutes with no escalation; 14 verify commands passed (npm ci, lint, build, vitest, ignore checks, 22 pinned skills); olibyte/agent-factory-benchmark#1"
       },
       {
+        "id": "T19",
+        "title": "Benchmark CI workflow through the factory",
+        "status": "todo",
+        "dependsOn": [
+          "T16"
+        ]
+      },
+      {
         "id": "T17",
         "title": "Move Terraform state to an S3 backend",
         "status": "later",

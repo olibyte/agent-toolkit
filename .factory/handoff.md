@@ -31,7 +31,7 @@ Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory.
 
 ## Current work
 
-- None in progress.
+- T19, the benchmark CI workflow. The design is in `.factory/plan.md` under "Benchmark CI workflow (T19)", and the task is `.factory/tasks/benchmark-ci.task.json`. It needs the worker token's Workflows permission (read and write). Run it with `node factory/cli.ts run .factory/tasks/benchmark-ci.task.json --worker ec2 --instance-type t3.medium`. It is done when the PR's own `CI` check passes, and passes again on `main` after the merge.
 
 ## Important decisions
 
@@ -57,7 +57,7 @@ Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory.
 ## Next recommended action
 
 1. Start the planning phase with the operator's `product-brief.md`. Design how the factory turns it into requirements and a task graph before running any product task.
-2. Small follow-ups for the benchmark repo, each as its own factory task: a CI workflow (it needs the worker token's Workflows permission, which only the operator can grant); dropping `vite-tsconfig-paths` for Vite's built-in `resolve.tsconfigPaths`, which Vitest suggests; and a decision on npm's `allow-scripts` warning for `unrs-resolver`.
+2. Small follow-ups for the benchmark repo, each as its own factory task: dropping `vite-tsconfig-paths` for Vite's built-in `resolve.tsconfigPaths`, which Vitest suggests; and a decision on npm's `allow-scripts` warning for `unrs-resolver`.
 3. Later: T17 moves Terraform state to an S3 backend once a second machine or person applies. T18 builds the task tracker, informed by the first real-app tasks.
 
 Follow the original working method. Record a short design for each new task in `.factory/plan.md` before building it, keep interfaces small, and verify against real systems.
