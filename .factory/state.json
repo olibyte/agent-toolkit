@@ -1,7 +1,7 @@
 {
   "version": 1,
   "work": {
-    "goal": "Run real-app tasks through the factory: the benchmark scaffold is done, product planning is next",
+    "goal": "Run real-app tasks through the factory: the scaffold, CI, and product brief are done, and the requirements are next",
     "plan": ".factory/plan.md",
     "tasks": [
       {
@@ -140,6 +140,15 @@
           "T16"
         ],
         "evidence": "run 20260927-014714-8c6b: Claude Code (sonnet) added .github/workflows/ci.yml on a t3.medium in about 4 minutes with no escalation; 10 verify commands passed (actionlint 1.7.12, SHA pins, PyYAML structure, npm ci, lint, build, test); olibyte/agent-factory-benchmark#2; GitHub Actions CI passed on the PR (run 36286762342) and on main at 8a7ae77 (run 36286878647)"
+      },
+      {
+        "id": "T20",
+        "title": "Benchmark product brief from the product intent, through the factory",
+        "status": "done",
+        "dependsOn": [
+          "T16"
+        ],
+        "evidence": "run 20260927-020435-a540: Claude Code (sonnet) wrote docs/product-brief.md (1037 words) on a t3.small in about 3 minutes with no escalation; 4 verify commands passed (only change, headings, scope, deny list); olibyte/agent-factory-benchmark#3, merged at 3bf00ec; CI passed on the PR and on main (run 36288213592)"
       },
       {
         "id": "T17",

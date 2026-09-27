@@ -4,7 +4,7 @@ Read this file, `.factory/plan.md`, and `.factory/state.json` (the task list) be
 
 ## Current goal
 
-Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory. It is a deliberately small task tracker that tests the factory workflow, not application complexity. T16 (the scaffold) and T19 (CI) are done. Next is the planning phase: product brief, factory-generated requirements, architecture, data model, API, and security decisions, acceptance tests, a dependency-aware task graph, Human Gate #1, then parallel implementation. The tasks are in `.factory/state.json`.
+Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory. It is a deliberately small task tracker that tests the factory workflow, not application complexity. T16 (the scaffold), T19 (CI), and T20 (the product brief) are done. The planning phase starts from the operator's short product intent, which is recorded in `.factory/plan.md` under "Benchmark product brief (T20)". The factory generated `docs/product-brief.md` from it (T20). Next come the requirements, architecture, data model, API, and security decisions, acceptance tests, a dependency-aware task graph, Human Gate #1, then parallel implementation. The tasks are in `.factory/state.json`.
 
 ## Completed work
 
@@ -32,6 +32,12 @@ Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory.
   - Run `20260927-014714-8c6b` of `.factory/tasks/benchmark-ci.task.json` completed in about 4 minutes on a `t3.medium`, with no escalation. `setup` checked actionlint 1.7.12 against its release SHA-256. All 10 verify commands passed: the only change was `ci.yml`, actionlint was clean, the SHA pins held, the PyYAML structure check passed, and so did `npm ci`, lint, build, and test.
   - It opened olibyte/agent-factory-benchmark#2 with one commit (`.github/workflows/ci.yml` +33), identical to the file tested before the run. GitHub Actions ran `CI / Lint, build, and test` on the PR and passed in 24s (run 36286762342), using Node 24.21.0 from `.nvmrc`. After the merge (`8a7ae77`), it passed on `main` too (run 36286878647).
   - The instance is `terminated`, no instances or volumes remain, and the run branch is deleted. Benchmark PRs so far were merged with merge commits, not squash.
+- T20, the product brief, with the design in `.factory/plan.md` under "Benchmark product brief (T20)":
+  - Run `20260927-020435-a540` of `.factory/tasks/benchmark-product-brief.task.json` completed in about 3 minutes on a `t3.small`, with no escalation. All 4 verify commands passed, and they passed again on a clone of the PR branch.
+  - It opened olibyte/agent-factory-benchmark#3 with one commit, `docs/product-brief.md` (+84 lines, 1037 words). CI and GitGuardian passed. The instance is `terminated`, and no instances or volumes remain.
+  - The brief covers the six capabilities, 12 non-goals, 10 success criteria, 6 assumptions (priority is Low, Medium, and High; each project has one owner; deleting a project deletes its tasks), and 7 open questions.
+  - The operator reviewed and merged it (`3bf00ec`), and CI passed on `main`. Notes from the review, not fixed: Target users says everyone who can see a project can work in it, which conflicts with the single-owner assumption. Open questions 1 and 5 both ask about sharing. There are no questions about the auth method or data retention, which the architecture step will need to raise. Headings have no blank line after them.
+  - The run branch is deleted.
 - Codex reviewed `factory/` read-only. Two findings were fixed: the GitHub token is now visible only in `prepare` and `publish`, and SIGINT cleanup waits for an in-flight launch. One finding was rejected: the `factory_secret` failure path never echoes the value.
 
 ## Current work
@@ -62,7 +68,7 @@ Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory.
 
 ## Next recommended action
 
-1. Start the planning phase with the operator's `product-brief.md`. Design how the factory turns it into requirements and a task graph before running any product task.
+1. Generate the requirements from `docs/product-brief.md` through the factory, then the rest of the planning steps up to Human Gate #1. Design each step in `.factory/plan.md` before running it. Where the brief conflicts with itself, the requirements follow its Assumptions (for example, single-owner projects), and the open questions stay open for Human Gate #1.
 2. Small follow-ups for the benchmark repo, each as its own factory task: dropping `vite-tsconfig-paths` for Vite's built-in `resolve.tsconfigPaths`, which Vitest suggests; and a decision on npm's `allow-scripts` warning for `unrs-resolver`.
 3. Later: T17 moves Terraform state to an S3 backend once a second machine or person applies. T18 builds the task tracker, informed by the first real-app tasks.
 
