@@ -4,7 +4,7 @@ Read this file, `.factory/plan.md`, and `.factory/state.json` (the task list) be
 
 ## Current goal
 
-Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory. It is a deliberately small task tracker that tests the factory workflow, not application complexity. T16, the scaffold, is done. Next is the planning phase: product brief, factory-generated requirements, architecture, data model, API, and security decisions, acceptance tests, a dependency-aware task graph, Human Gate #1, then parallel implementation. The tasks are in `.factory/state.json`.
+Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory. It is a deliberately small task tracker that tests the factory workflow, not application complexity. T16 (the scaffold) and T19 (CI) are done. Next is the planning phase: product brief, factory-generated requirements, architecture, data model, API, and security decisions, acceptance tests, a dependency-aware task graph, Human Gate #1, then parallel implementation. The tasks are in `.factory/state.json`.
 
 ## Completed work
 
@@ -27,11 +27,16 @@ Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory.
   - Both PRs are merged: olibyte/agent-factory-benchmark#1 (a merge commit, `689960a` on its `main`) and the T16 docs in olibyte/agent-toolkit#10. Their branches are deleted, as are the leftover `docs/t15-agent-proof` and the run branch `factory/20260927-011023-06e6`.
   - A clean clone of the PR branch also passed `npm ci`, lint, build, and test on the operator's Mac, and the tree stayed clean. Every Slack event was delivered with no sink failures. The instance is `terminated`, and no factory instances or volumes remain.
   - `publish` warned about trailing whitespace in vendored Vercel skill files. `git apply` accepted it, and it is harmless.
+- T19, the benchmark CI workflow, with the design in `.factory/plan.md` under "Benchmark CI workflow (T19)":
+  - The operator gave the worker token the Workflows permission (read and write).
+  - Run `20260927-014714-8c6b` of `.factory/tasks/benchmark-ci.task.json` completed in about 4 minutes on a `t3.medium`, with no escalation. `setup` checked actionlint 1.7.12 against its release SHA-256. All 10 verify commands passed: the only change was `ci.yml`, actionlint was clean, the SHA pins held, the PyYAML structure check passed, and so did `npm ci`, lint, build, and test.
+  - It opened olibyte/agent-factory-benchmark#2 with one commit (`.github/workflows/ci.yml` +33), identical to the file tested before the run. GitHub Actions ran `CI / Lint, build, and test` on the PR and passed in 24s (run 36286762342), using Node 24.21.0 from `.nvmrc`. After the merge (`8a7ae77`), it passed on `main` too (run 36286878647).
+  - The instance is `terminated`, no instances or volumes remain, and the run branch is deleted. Benchmark PRs so far were merged with merge commits, not squash.
 - Codex reviewed `factory/` read-only. Two findings were fixed: the GitHub token is now visible only in `prepare` and `publish`, and SIGINT cleanup waits for an in-flight launch. One finding was rejected: the `factory_secret` failure path never echoes the value.
 
 ## Current work
 
-- T19, the benchmark CI workflow. The design is in `.factory/plan.md` under "Benchmark CI workflow (T19)", and the task is `.factory/tasks/benchmark-ci.task.json`. It needs the worker token's Workflows permission (read and write). Run it with `node factory/cli.ts run .factory/tasks/benchmark-ci.task.json --worker ec2 --instance-type t3.medium`. It is done when the PR's own `CI` check passes, and passes again on `main` after the merge.
+- None in progress.
 
 ## Important decisions
 
@@ -43,6 +48,7 @@ Build the benchmark app, `olibyte/agent-factory-benchmark`, through the factory.
 - The user asked for Terraform, not CloudFormation, so `factory/infra/` replaced the CloudFormation template before anything was deployed. Resources have fixed names (`agent-factory-worker`, `/agent-factory/`), and the CLI finds the security group by name instead of reading Terraform state. State stays local and gitignored for now.
 - AWS access: a dedicated member account under IAM Identity Center, with the `agent-factory` SSO profile. `FACTORY_AWS_PROFILE` scopes that profile to factory commands only, so other tools keep their own AWS settings. No root keys.
 - Root runs only controller-rendered steps. Everything the task defines runs as `factory-task`, which is blocked from IMDS. Data crosses from the task user to root only as stdout of a process that runs as the task user (the blocked signal and the patch). Root treats that data as untrusted, and `git apply` refuses `.git/`, `..`, and writes through symlinks.
+- The worker token has Contents, Pull requests, and Workflows (read and write) on the sandbox and the benchmark. Benchmark PRs get an independent `CI` check from GitHub Actions. It is not a required check yet: that is the operator's call.
 - Real-app task files live in `.factory/tasks/`, in agent-toolkit. The app repo holds no factory code. App skills are pinned per source to a commit through GitHub tree URLs with `skills@1.7.0`. Use a `t3.medium` or larger for Next.js builds.
 - Remaining limits: the task user has open network egress and holds the agent API key during `change`. Only the Claude Code agent path has run on EC2 (T15). The Codex path has passed `bash -n` and tests only. The local worker runs everything as the operator, with no isolation.
 
