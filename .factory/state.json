@@ -1,7 +1,7 @@
 {
   "version": 1,
   "work": {
-    "goal": "Run real-app tasks through the factory: the scaffold, CI, product brief, and requirements are done, and the architecture is next",
+    "goal": "Run real-app tasks through the factory: the scaffold, CI, product brief, and requirements are done, and the architecture is in review",
     "plan": ".factory/plan.md",
     "tasks": [
       {
@@ -167,6 +167,15 @@
           "T21"
         ],
         "evidence": "run 20260927-024402-2f06: setup downloaded the T21 draft from #4 at 921dd4b, and Claude Code (sonnet) revised it with the operator's decisions (40 FRs, 6 NFRs, 2069 words) on a t3.small in about 6.5 minutes with no escalation; 5 verify commands passed; olibyte/agent-factory-benchmark#5; CI passed on the PR"
+      },
+      {
+        "id": "T23",
+        "title": "Benchmark architecture from the brief and requirements, through the factory",
+        "status": "done",
+        "dependsOn": [
+          "T22"
+        ],
+        "evidence": "run 20260927-030917-c82a: setup installed Node 24 and the app's packages, and Claude Code (sonnet) wrote docs/architecture.md (13 decisions, coverage of all 46 requirements, no new packages, 2467 words) on a t3.small in about 8.5 minutes with no escalation; 6 verify commands passed; olibyte/agent-factory-benchmark#6; CI passed on the PR"
       },
       {
         "id": "T17",
