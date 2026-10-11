@@ -135,8 +135,8 @@ node "$ROOT/scripts/import-pstack.mjs" --from "$PSTACK_SKILLS" --pack principles
 
 shopt -s nullglob
 references=("$ROOT/skills/principles/references"/principle-*.md)
-if [[ ${#references[@]} -ne 23 ]]; then
-  echo "expected 23 principle-*.md files, found ${#references[@]}" >&2
+if [[ ${#references[@]} -ne 24 ]]; then
+  echo "expected 24 principle-*.md files, found ${#references[@]}" >&2
   exit 1
 fi
 siblings=("$ROOT/skills"/principle-*)

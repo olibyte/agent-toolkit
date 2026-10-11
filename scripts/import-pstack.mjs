@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const ALLOWED_KEYS = new Set(['name', 'description', 'license'])
+const ALLOWED_KEYS = new Set(['name', 'description', 'license', 'paths'])
 const SIBLING_DIRS = ['playbooks', 'scripts', 'references', 'assets']
 const HOST_AGNOSTIC_REPLACES = [
   ['`subagent_type`: `generalPurpose`', "the host's general-purpose subagent"],
@@ -113,7 +113,7 @@ const MODEL_BINDING_REPLACES = [
     '- `model`: `how explainer` from `.agents/models.md` when present. Otherwise omit `model`',
   ],
 ]
-const PRINCIPLE_LEAF_COUNT = 23
+const PRINCIPLE_LEAF_COUNT = 24
 const PRINCIPLES_PACK_DESCRIPTION =
   'Apply named engineering principles such as laziness, prove-it-works, and model-the-domain. Use when choosing a design, sequencing work, reviewing a diff, or the user names a principle.'
 
