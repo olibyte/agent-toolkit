@@ -1,3 +1,4 @@
+
 # Migrate Callers Then Delete Legacy APIs
 
 When we decide a new API is the right design, migrate callers and remove the old API in the same refactor wave instead of preserving compatibility layers.

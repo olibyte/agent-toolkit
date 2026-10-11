@@ -3,3 +3,5 @@ interrogate
 figure-it-out
 create-verification-skill
 maintain-verification-skill
+reflect
+automate-me

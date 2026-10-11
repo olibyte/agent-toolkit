@@ -22,7 +22,7 @@ Commit `.agents/skills/`, `.claude/skills/`, `skills-lock.json`, `AGENTS.md`, an
 
 Working style from [pstack](https://github.com/cursor/plugins/tree/main/pstack): match a playbook, name the data shape, delegate the implementation, check the real artifact. Casual turns skip it.
 
-Codex: `$poteto-mode`. Claude Code, Cursor, and Antigravity: `/poteto-mode`. Playbooks live in [`skills/poteto-mode/SKILL.md`](skills/poteto-mode/SKILL.md).
+Codex: `$poteto-mode`. Claude Code, Cursor, and Antigravity: `/poteto-mode`. Playbooks live in [`skills/poteto-mode/SKILL.md`](skills/poteto-mode/SKILL.md). `/poteto-help` picks a skill or playbook. `/ketchup` catches you up on this chat since your last message.
 
 ## Optional skills
 
@@ -32,6 +32,7 @@ These live under `optional/` so a default Codex session stays small. Drop any `-
 npx skills@latest add olibyte/agent-toolkit --full-depth \
   -s swarm -s interrogate -s figure-it-out \
   -s create-verification-skill -s maintain-verification-skill \
+  -s reflect -s automate-me \
   -a claude-code -a cursor -a codex -a antigravity -a antigravity-cli -y
 ```
 
@@ -42,8 +43,10 @@ Invoke as `$name` or `/name`.
 - **figure-it-out.** Write a playbook when none fits, then run it.
 - **create-verification-skill.** Write a project-local `verify-<app>` skill under `.agents/skills/`.
 - **maintain-verification-skill.** Recheck that map against source and a live pass, then open at most one PR of proven corrections.
+- **reflect.** Mine this chat for durable lessons and route each one to a skill edit.
+- **automate-me.** Draft a personal mode skill from recent transcripts.
 
-poteto-mode calls swarm, interrogate, and figure-it-out when they are installed, and skips them with a reason when they are absent.
+poteto-mode calls swarm, interrogate, figure-it-out, and reflect when they are installed, and skips them with a reason when they are absent.
 
 ## Factory
 

@@ -17,4 +17,7 @@
 # arena cross-judge pool: inherit
 # swarm workers: inherit
 # architect runners: inherit, inherit, inherit
-# interrogate reviewers: inherit, inherit
+# interrogate reviewers: inherit
+# reflect tooling: inherit
+# reflect judgment, divergent, synthesizer: inherit
+# recall miners: inherit, inherit
